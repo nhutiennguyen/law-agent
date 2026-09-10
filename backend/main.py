@@ -1,6 +1,6 @@
 # backend/main.py — Điểm khởi động ứng dụng FastAPI & Mount Frontend
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -12,6 +12,16 @@ app = FastAPI(
     description="Cố vấn Pháp lý Trí tuệ Nhân tạo - Tư vấn Pháp luật Việt Nam chuyên sâu theo quy chuẩn 4 bước",
     version=settings.VERSION
 )
+
+# Cấu hình Security Headers chống clickjacking, MIME-sniffing, XSS
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
 
 # Cấu hình CORS để frontend giao tiếp thông suốt
 app.add_middleware(

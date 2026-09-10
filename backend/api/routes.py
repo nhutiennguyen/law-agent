@@ -1,7 +1,6 @@
-# backend/api/routes.py — Định tuyến API endpoints
-
+import logging
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Query, status
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Query, Request, status
 from backend.models.schemas import (
     ChatRequest,
     ChatResponse,
@@ -20,7 +19,14 @@ from backend.core.legal_prompts import SUPPORTED_CATEGORIES
 from backend.core.court_prompts import PRESET_COURT_CASES
 from backend.core.contract_parser import contract_parser
 from backend.core.rag_engine import rag_engine
+from backend.core.security import (
+    chat_limiter,
+    upload_limiter,
+    validate_message_length,
+    validate_uploaded_file
+)
 
+logger = logging.getLogger("ai_lawyer.api")
 router = APIRouter(prefix="/api", tags=["Legal AI"])
 
 # --- SYSTEM & CATEGORIES ---
@@ -73,17 +79,23 @@ async def get_law_article(law_id: str, article_number: str):
 # --- CHAT CONSULTATION ---
 
 @router.post("/chat", response_model=ChatResponse)
-async def legal_chat(request: ChatRequest):
-    """Tiếp nhận câu hỏi pháp lý và trả lời theo chuẩn mực 4 bước của Luật sư kết hợp RAG."""
-    if not request.message.strip():
+async def legal_chat(request: ChatRequest, req: Request):
+    """Tiếp nhận câu hỏi pháp lý và trả lời theo chuẩn mực của Luật sư kết hợp RAG."""
+    # 1. Chống spam / DDoS
+    chat_limiter.check_rate_limit(req)
+
+    # 2. Kiểm tra dữ liệu đầu vào
+    msg = request.message.strip()
+    if not msg:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Nội dung câu hỏi không được để trống."
         )
+    validate_message_length(msg)
 
     try:
         response = await legal_service.consult_legal_matter(
-            message=request.message,
+            message=msg,
             history=request.history,
             category=request.category,
             custom_api_key=request.api_key,
@@ -92,15 +104,20 @@ async def legal_chat(request: ChatRequest):
         return response
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
-    except RuntimeError as re:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(re))
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Lỗi không xác định: {str(e)}")
+        logger.exception(f"Lỗi khi xử lý chat: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Hệ thống AI đang bận hoặc gặp sự cố tạm thời. Vui lòng thử lại sau giây lát."
+        )
 
 # --- CONTRACT REVIEW ---
 
 @router.post("/review-contract", response_model=ContractReviewResponse)
 async def review_contract(
+    req: Request,
     file: Optional[UploadFile] = File(None),
     text_content: Optional[str] = Form(None),
     party_role: str = Form("Bên tham gia hợp đồng"),
@@ -109,14 +126,20 @@ async def review_contract(
     model: Optional[str] = Form(None)
 ):
     """Thẩm định và rà soát hợp đồng (hỗ trợ upload PDF, DOCX, TXT, Hình ảnh scan hoặc dán trực tiếp text)."""
+    # 1. Chống spam upload làm tràn RAM
+    upload_limiter.check_rate_limit(req)
+
     contract_text = ""
     filename = "hop_dong_truc_tuyen.txt"
     raw_bytes = None
     mime_type = None
 
     if file:
-        filename = file.filename
+        filename = file.filename or "uploaded_file"
         file_bytes = await file.read()
+        
+        # 2. Kiểm tra định dạng và dung lượng file (< 10MB)
+        validate_uploaded_file(filename, len(file_bytes))
         mime_type = file.content_type
         
         try:
@@ -131,6 +154,12 @@ async def review_contract(
 
     elif text_content and text_content.strip():
         contract_text = text_content.strip()
+        # Giới hạn độ dài dán text tối đa 50.000 ký tự (~20 trang văn bản)
+        if len(contract_text) > 50000:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Văn bản dán vào vượt quá 50.000 ký tự. Với hợp đồng dài, vui lòng tải file trực tiếp (PDF/Word)."
+            )
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -151,10 +180,14 @@ async def review_contract(
         return response
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
-    except RuntimeError as re:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(re))
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Lỗi thẩm định: {str(e)}")
+        logger.exception(f"Lỗi thẩm định hợp đồng: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Quá trình thẩm định gặp sự cố hoặc file bị lỗi cấu trúc. Vui lòng thử lại với file khác."
+        )
 
 # --- PHIÊN TÒA GIẢ LẬP (MOOT COURT API) ---
 
@@ -164,20 +197,26 @@ async def get_court_presets():
     return PRESET_COURT_CASES
 
 @router.post("/moot-court/turn", response_model=CourtTurnResponse)
-async def court_turn(request: CourtTurnRequest):
+async def court_turn(request: CourtTurnRequest, req: Request):
     """Xử lý lượt đối chất phản biện của Luật sư đối phương."""
-    if not request.user_argument.strip():
+    # 1. Chống spam
+    chat_limiter.check_rate_limit(req)
+
+    # 2. Kiểm tra độ dài lời tranh tụng
+    arg = request.user_argument.strip()
+    if not arg:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Lời tranh luận không được để trống."
         )
+    validate_message_length(arg)
 
     try:
         response = await legal_service.simulate_court_turn(
             case_title=request.case_title,
             case_facts=request.case_facts,
             user_role=request.user_role,
-            user_argument=request.user_argument,
+            user_argument=arg,
             dialogue_history=request.dialogue_history,
             custom_api_key=request.api_key,
             model_override=request.model
@@ -185,14 +224,20 @@ async def court_turn(request: CourtTurnRequest):
         return response
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
-    except RuntimeError as re:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(re))
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Lỗi đối chất: {str(e)}")
+        logger.exception(f"Lỗi đối chất phiên tòa: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Phiên tòa tạm dừng do lỗi xử lý. Vui lòng gửi lại luận điểm."
+        )
 
 @router.post("/moot-court/verdict", response_model=VerdictResponse)
-async def court_verdict(request: VerdictRequest):
+async def court_verdict(request: VerdictRequest, req: Request):
     """Yêu cầu Thẩm phán tuyên án sơ bộ dựa trên toàn bộ diễn biến tranh tụng."""
+    chat_limiter.check_rate_limit(req)
+
     if not request.dialogue_history:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -211,7 +256,11 @@ async def court_verdict(request: VerdictRequest):
         return response
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
-    except RuntimeError as re:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(re))
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Lỗi tuyên án: {str(e)}")
+        logger.exception(f"Lỗi tuyên án: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Hội đồng xét xử đang bận, vui lòng thử lại sau giây lát."
+        )
