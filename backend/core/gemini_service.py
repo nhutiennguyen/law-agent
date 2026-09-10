@@ -1,6 +1,7 @@
 # backend/core/gemini_service.py — Service kết nối Gemini qua Google GenAI SDK tích hợp RAG
 
 import re
+import json
 import logging
 import unicodedata
 from typing import List, Optional, Any, Dict
@@ -56,7 +57,7 @@ class GeminiLegalService:
     def _resolve_model(self, model_override: Optional[str] = None) -> str:
         """Chuẩn hóa model name, tự động dùng model mới nhất nếu model cũ bị deprecated."""
         model = (model_override or "").strip()
-        if not model or "2.5" in model:
+        if not model or "2.5" in model or "2.0" in model or "1.5" in model:
             return settings.DEFAULT_MODEL
         return model
 
@@ -64,12 +65,12 @@ class GeminiLegalService:
         """Gọi model với cơ chế tự động fallback nếu model gặp 503 high demand hoặc 429 quota."""
         model_queue = [primary_model]
         for m in [
+            "gemini-3.5-flash",
+            "gemini-flash-latest",
             "gemini-3.6-flash",
             "gemini-3.7-flash",
-            "gemini-3.5-flash",
-            "gemini-2.5-flash",
-            "gemini-2.5-flash-lite",
-            "gemini-flash-latest"
+            "gemini-3.5-flash-lite",
+            "gemini-flash-lite-latest"
         ]:
             if m not in model_queue:
                 model_queue.append(m)
@@ -273,6 +274,135 @@ class GeminiLegalService:
                 user_err = f"Đã xảy ra lỗi khi kết nối với máy chủ AI: {err_msg}"
             raise RuntimeError(user_err)
 
+    async def consult_legal_matter_stream(
+        self,
+        message: str,
+        history: List[ChatMessage] = [],
+        category: str = "Tư vấn Tổng hợp",
+        custom_api_key: Optional[str] = None,
+        model_override: Optional[str] = None
+    ):
+        """Xử lý tư vấn pháp lý với Gemini dưới dạng Server-Sent Events (SSE) stream."""
+        try:
+            client = self._get_client(custom_api_key)
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
+            return
+
+        model_name = self._resolve_model(model_override)
+        is_meta = self._is_conversational_or_meta_query(message)
+
+        relevant_articles = []
+        rag_context_prompt = ""
+
+        if not is_meta:
+            relevant_articles = rag_engine.search(message, category=category, top_k=3)
+            if relevant_articles:
+                rag_context_prompt = "\n=== VĂN BẢN QUY PHẠM PHÁP LUẬT THAM CHIẾU (NGUỒN CHÍNH THỐNG VBPL.VN) ===\n"
+                for art in relevant_articles:
+                    rag_context_prompt += (
+                        f"\n【{art['law_name']} - {art['article_number']}: {art['article_title']}】\n"
+                        f"{art['content']}\n"
+                        f"Nguồn xác thực Nhà nước: {art['official_source']}\n"
+                    )
+                rag_context_prompt += (
+                    "\nLƯU Ý DÀNH CHO BẠN: Hãy vận dụng các điều luật trên vào phân tích thực tế một cách tự nhiên, "
+                    "dễ hiểu, giải thích thẳng vào câu trả lời thân chủ cần. Tránh chép nguyên văn khô cứng như sách giáo khoa!\n"
+                )
+        else:
+            rag_context_prompt = (
+                "\n[CHỈ DẪN QUAN TRỌNG]: Người dùng đang chào hỏi hoặc hỏi về danh tính / người sáng lập của bạn. "
+                "Hãy trả lời thật tự nhiên, thông minh, lịch sự, thân thiện và ấm áp. "
+                "Khẳng định rõ bạn là 'Huỳnh Nguyên Khang' — trợ lý cố vấn pháp lý AI được sáng lập và phát triển bởi 'Bố Bảo'. "
+                "TUYỆT ĐỐI KHÔNG trích dẫn điều luật hay phân tích cấu trúc hành chính vào câu trả lời này.\n"
+            )
+
+        citations_list = [
+            {
+                "law_id": a["law_id"],
+                "law_name": a["law_name"],
+                "article_number": a["article_number"],
+                "article_title": a["article_title"],
+                "official_source": a["official_source"],
+                "content": a["content"],
+                "relevance_score": a.get("relevance_score")
+            }
+            for a in relevant_articles
+        ]
+
+        # 1. Gửi sự kiện danh sách điều luật trích dẫn RAG
+        yield f"data: {json.dumps({'type': 'citations', 'citations': citations_list}, ensure_ascii=False)}\n\n"
+
+        contents = []
+        for item in history:
+            role = "model" if item.role in ["assistant", "model"] else "user"
+            contents.append(
+                types.Content(
+                    role=role,
+                    parts=[types.Part.from_text(text=item.content)]
+                )
+            )
+
+        category_header = f"[Lĩnh vực tham vấn: {category}]\n" if category and category != "Tư vấn Tổng hợp" and not is_meta else ""
+        user_content_text = f"{category_header}{rag_context_prompt}\n[Câu hỏi của người dùng]:\n{message}"
+
+        contents.append(
+            types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=user_content_text)]
+            )
+        )
+
+        config = types.GenerateContentConfig(
+            system_instruction=LEGAL_SYSTEM_INSTRUCTION,
+            temperature=0.5 if is_meta else 0.35,
+            top_p=0.95,
+        )
+
+        model_queue = [
+            "gemini-3.5-flash",
+            "gemini-flash-latest",
+            "gemini-3.6-flash",
+            "gemini-3.7-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-flash-lite-latest"
+        ]
+        if model_override and model_override.strip() in model_queue:
+            model_queue.remove(model_override.strip())
+            model_queue.insert(0, model_override.strip())
+
+        stream_success = False
+        full_reply_text = ""
+        used_model = model_queue[0]
+
+        for m in model_queue:
+            try:
+                stream = client.models.generate_content_stream(model=m, contents=contents, config=config)
+                for chunk in stream:
+                    if chunk.text:
+                        full_reply_text += chunk.text
+                        yield f"data: {json.dumps({'type': 'token', 'token': chunk.text}, ensure_ascii=False)}\n\n"
+                used_model = m
+                stream_success = True
+                break
+            except Exception as e:
+                logger.warning(f"Streaming model {m} failed ({str(e)[:80]}), trying next fallback...")
+                if not full_reply_text:
+                    continue
+                else:
+                    yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
+                    return
+
+        if not stream_success:
+            yield f"data: {json.dumps({'type': 'error', 'error': 'Tất cả mô hình AI đang bận hoặc quá tải quota. Vui lòng thử lại sau giây lát.'}, ensure_ascii=False)}\n\n"
+            return
+
+        # Tách khối gợi ý hỏi tiếp để hiển thị chips tương tác
+        clean_reply, follow_ups = self._extract_follow_ups(full_reply_text)
+
+        yield f"data: {json.dumps({'type': 'follow_ups', 'follow_ups': follow_ups}, ensure_ascii=False)}\n\n"
+        yield f"data: {json.dumps({'type': 'done', 'model_used': used_model, 'disclaimer': LEGAL_DISCLAIMER}, ensure_ascii=False)}\n\n"
+
     async def review_contract_document(
         self,
         contract_text: str,
@@ -284,7 +414,7 @@ class GeminiLegalService:
         custom_api_key: Optional[str] = None,
         model_override: Optional[str] = None
     ) -> ContractReviewResponse:
-        """Thẩm định và rà soát hợp đồng theo ma trận 5 phần tích hợp RAG."""
+        """Thẩm định và rà soát hợp đồng theo ma trận 5 phần tích hợp RAG & Multimodal Vision OCR."""
         client = self._get_client(custom_api_key)
         model_name = self._resolve_model(model_override)
 
@@ -308,17 +438,27 @@ class GeminiLegalService:
 
         parts = [types.Part.from_text(text=prompt_instruction)]
 
-        if contract_text and contract_text.strip():
-            parts.append(
-                types.Part.from_text(
-                    text=f"\n=== NỘI DUNG VĂN BẢN HỢP ĐỒNG ===\n\n{contract_text}"
-                )
-            )
-        elif raw_bytes and mime_type:
+        # Multimodal Vision: Nếu có raw_bytes (ảnh chụp scan, PDF có con dấu/chữ ký) thì truyền trực tiếp vào Gemini Vision
+        has_bytes = bool(raw_bytes and mime_type)
+        has_text = bool(contract_text and contract_text.strip())
+
+        if has_bytes:
             parts.append(
                 types.Part.from_bytes(
                     data=raw_bytes,
                     mime_type=mime_type
+                )
+            )
+            if has_text:
+                parts.append(
+                    types.Part.from_text(
+                        text=f"\n=== VĂN BẢN TRÍCH XUẤT ĐÍNH KÈM (THAM KHẢO THÊM) ===\n\n{contract_text}"
+                    )
+                )
+        elif has_text:
+            parts.append(
+                types.Part.from_text(
+                    text=f"\n=== NỘI DUNG VĂN BẢN HỢP ĐỒNG ===\n\n{contract_text}"
                 )
             )
         else:

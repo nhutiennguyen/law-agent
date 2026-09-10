@@ -2119,5 +2119,60 @@ body {
     color: var(--gold-primary);
 }
 
+/* =========================================================================
+   DOCX EXPORT BUTTONS & CHAT ACTIONS
+   ========================================================================= */
+.btn-export-docx {
+    background: linear-gradient(135deg, #1E3A8A 0%, #0F172A 100%) !important;
+    color: #F59E0B !important;
+    border: 1px solid rgba(245, 158, 11, 0.45) !important;
+    font-weight: 600 !important;
+    display: inline-flex !important;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.25s ease !important;
+}
 
+.btn-export-docx:hover {
+    background: linear-gradient(135deg, #1D4ED8 0%, #1E293B 100%) !important;
+    border-color: #F59E0B !important;
+    box-shadow: 0 0 14px rgba(245, 158, 11, 0.3) !important;
+    transform: translateY(-1px);
+    color: #FFFFFF !important;
+}
 
+.chat-msg-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.12);
+}
+
+.btn-chat-action {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #94A3B8;
+    font-size: 12px;
+    padding: 4px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-main);
+}
+
+.btn-chat-action:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #F8FAFC;
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.btn-chat-action.export-word:hover {
+    color: #F59E0B;
+    border-color: rgba(245, 158, 11, 0.6);
+    background: rgba(245, 158, 11, 0.08);
+}

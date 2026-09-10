@@ -54,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultContent = document.getElementById('result-content');
     const btnCopyResult = document.getElementById('btn-copy-result');
     const btnPrintResult = document.getElementById('btn-print-result');
+    const btnExportDocx = document.getElementById('btn-export-docx');
 
     // --- DOM Elements: View 3 (Moot Court) ---
     const courtSetupCard = document.getElementById('court-setup-card');
@@ -107,6 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let allSessions = loadSessions();
     let selectedContractFile = null;
     let lastReviewRawText = '';
+    let lastReviewCitations = [];
 
     // Moot Court State
     let courtPresets = [];
@@ -219,6 +221,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         btnPrintResult.addEventListener('click', () => window.print());
+
+        if (btnExportDocx) {
+            btnExportDocx.addEventListener('click', downloadContractDocx);
+        }
 
         // Moot Court Events
         btnEnterCourt.addEventListener('click', enterCourtArena);
@@ -677,6 +683,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const data = await response.json();
             lastReviewRawText = data.review_result;
+            lastReviewCitations = data.citations || [];
 
             resultDocName.textContent = `Báo Cáo Thẩm Định: ${data.filename || 'Dự thảo Hợp đồng'}`;
             if (resultModelBadge) resultModelBadge.textContent = '⚖️ Thẩm định hoàn tất';
@@ -690,6 +697,86 @@ document.addEventListener('DOMContentLoaded', () => {
             reviewLoading.style.display = 'none';
             btnStartReview.disabled = false;
             alert('⚠️ Lỗi kết nối tới máy chủ AI.');
+        }
+    }
+
+    async function downloadContractDocx() {
+        if (!lastReviewRawText) {
+            alert('Chưa có nội dung kết quả thẩm định để xuất file Word.');
+            return;
+        }
+
+        const originalHtml = btnExportDocx.innerHTML;
+        btnExportDocx.disabled = true;
+        btnExportDocx.innerHTML = '⏳ Đang tạo file Word...';
+
+        try {
+            const fileName = selectedContractFile ? selectedContractFile.name : 'Dự thảo Hợp đồng';
+            const role = partyRoleSelect ? partyRoleSelect.value : 'Toàn diện';
+
+            const response = await fetch('/api/export-contract-docx', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    analysis_text: lastReviewRawText,
+                    contract_title: fileName,
+                    protect_side: role,
+                    citations: lastReviewCitations
+                })
+            });
+
+            if (!response.ok) throw new Error('Máy chủ phản hồi lỗi khi xuất Word.');
+
+            const blob = await response.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            const safeName = fileName.replace(/\.[^/.]+$/, '').replace(/\s+/g, '_');
+            a.download = `Bao_cao_tham_dinh_${safeName}.docx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(downloadUrl);
+
+            btnExportDocx.innerHTML = '✅ Đã tải file Word!';
+            setTimeout(() => {
+                btnExportDocx.innerHTML = originalHtml;
+                btnExportDocx.disabled = false;
+            }, 2500);
+
+        } catch (err) {
+            btnExportDocx.innerHTML = originalHtml;
+            btnExportDocx.disabled = false;
+            alert('Không thể tạo file Word. Vui lòng thử lại sau.');
+        }
+    }
+
+    async function downloadChatDocx(topic, opinionText, citations = []) {
+        try {
+            const response = await fetch('/api/export-chat-docx', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    topic: topic || 'Tư vấn Pháp lý',
+                    opinion_text: opinionText,
+                    citations: citations
+                })
+            });
+
+            if (!response.ok) throw new Error('Lỗi xuất file Word');
+
+            const blob = await response.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            const safeTopic = (topic || 'AI_Lawyer').substring(0, 25).replace(/\s+/g, '_');
+            a.download = `Thu_tu_van_phap_ly_${safeTopic}.docx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(downloadUrl);
+        } catch (e) {
+            alert('Không thể xuất Thư tư vấn ra file Word. Vui lòng thử lại.');
         }
     }
 
@@ -772,10 +859,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const typingEl = showTypingIndicator();
 
         const apiKey = localStorage.getItem('ai_lawyer_api_key') || null;
-        const model = localStorage.getItem('ai_lawyer_model') || 'gemini-2.5-flash';
+        const model = localStorage.getItem('ai_lawyer_model') || 'gemini-3.5-flash';
 
         try {
-            const response = await fetch('/api/chat', {
+            const response = await fetch('/api/chat/stream', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -795,19 +882,91 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const data = await response.json();
-            appendMessage('assistant', data.reply, data.citations, data.follow_ups);
+            // Tạo message row cho assistant ngay lập tức để stream từng từ vào
+            const row = document.createElement('div');
+            row.className = 'message-row assistant';
+
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar';
+            avatar.textContent = '⚖️';
+
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+
+            // Khối chứa văn bản phản hồi được stream
+            const textContainer = document.createElement('div');
+            textContainer.className = 'message-stream-text';
+            bubble.appendChild(textContainer);
+
+            row.appendChild(avatar);
+            row.appendChild(bubble);
+            messagesList.appendChild(row);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            // Xử lý luồng SSE
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let buffer = '';
+            let accumulatedText = '';
+            let streamCitations = [];
+            let streamFollowUps = [];
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (!trimmed.startsWith('data:')) continue;
+                    const jsonStr = trimmed.substring(5).trim();
+                    if (!jsonStr) continue;
+
+                    try {
+                        const evt = JSON.parse(jsonStr);
+                        if (evt.type === 'citations') {
+                            streamCitations = evt.citations || [];
+                            if (streamCitations.length > 0) {
+                                renderCitationsInsideBubble(bubble, streamCitations, textContainer);
+                            }
+                        } else if (evt.type === 'token') {
+                            accumulatedText += evt.token;
+                            textContainer.innerHTML = marked.parse(accumulatedText);
+                            chatContainer.scrollTop = chatContainer.scrollHeight;
+                        } else if (evt.type === 'follow_ups') {
+                            streamFollowUps = evt.follow_ups || [];
+                        } else if (evt.type === 'error') {
+                            accumulatedText += `\n\n⚠️ **Lỗi:** ${evt.error}`;
+                            textContainer.innerHTML = marked.parse(accumulatedText);
+                        }
+                    } catch (pe) {
+                        console.error('Error parsing SSE event:', pe);
+                    }
+                }
+            }
+
+            // Render gợi ý hỏi tiếp (Follow-up chips)
+            if (streamFollowUps.length > 0) {
+                renderFollowUpsInsideBubble(bubble, streamFollowUps);
+            }
+
+            // Render thanh công cụ: Sao chép & Tải Word (.docx)
+            renderMessageActions(bubble, text, accumulatedText, streamCitations);
+
             currentHistory.push({
                 role: 'assistant',
-                content: data.reply,
-                citations: data.citations,
-                follow_ups: data.follow_ups
+                content: accumulatedText,
+                citations: streamCitations,
+                follow_ups: streamFollowUps
             });
 
             saveSessionRecord(text);
         } catch (error) {
-            typingEl.remove();
-            appendMessage('assistant', `⚠️ **Lỗi kết nối tới máy chủ AI.**`);
+            if (typingEl && typingEl.parentNode) typingEl.remove();
+            appendMessage('assistant', `⚠️ **Lỗi kết nối tới máy chủ AI.** Vui lòng kiểm tra lại mạng hoặc thử lại.`);
         }
     }
 
@@ -825,53 +984,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 1. Render RAG Official Law Citations
         if (role === 'assistant' && citations && citations.length > 0) {
-            const citeContainer = document.createElement('div');
-            citeContainer.className = 'law-citations-container';
-            citeContainer.innerHTML = `
-                <div class="law-citations-title">📚 CĂN CỨ PHÁP LÝ ĐỐI CHIẾU CHÍNH QUY (VBPL.VN):</div>
-                <div class="law-citations-list"></div>
-            `;
-            const citeList = citeContainer.querySelector('.law-citations-list');
-            citations.forEach(c => {
-                const badge = document.createElement('button');
-                badge.className = 'law-citation-badge';
-                badge.type = 'button';
-                const artTitle = c.article_title || c.title || c.law_name || 'Điều luật';
-                const artSrc = c.official_source || c.source || 'vbpl.vn';
-                badge.title = `Nhấn để xem nguyên văn ${c.article_number} (${c.law_name})`;
-                badge.innerHTML = `<span class="badge-icon">📖</span> <strong>${escapeHtml(c.article_number)}</strong>: ${escapeHtml(artTitle)} <span class="badge-source">${escapeHtml(artSrc)}</span>`;
-                badge.addEventListener('click', () => {
-                    openLawModal(c);
-                });
-                citeList.appendChild(badge);
-            });
-            bubble.appendChild(citeContainer);
+            renderCitationsInsideBubble(bubble, citations);
         }
 
         // 2. Render Interactive Socratic Follow-up Chips
         if (role === 'assistant' && followUps && followUps.length > 0) {
-            const followUpContainer = document.createElement('div');
-            followUpContainer.className = 'follow-ups-container';
-            followUpContainer.innerHTML = `
-                <div class="follow-ups-title">💡 GỢI Ý BƯỚC TIẾP THEO DÀNH CHO BẠN:</div>
-                <div class="follow-ups-list"></div>
-            `;
-            const followUpList = followUpContainer.querySelector('.follow-ups-list');
-            followUps.forEach(prompt => {
-                const chip = document.createElement('button');
-                chip.className = 'follow-up-chip';
-                chip.type = 'button';
-                chip.innerHTML = `<span class="chip-icon">💬</span> <span>${escapeHtml(prompt)}</span>`;
-                chip.addEventListener('click', () => {
-                    userInput.value = prompt;
-                    userInput.style.height = 'auto';
-                    userInput.style.height = Math.min(userInput.scrollHeight, 160) + 'px';
-                    btnSend.disabled = false;
-                    sendMessage();
-                });
-                followUpList.appendChild(chip);
-            });
-            bubble.appendChild(followUpContainer);
+            renderFollowUpsInsideBubble(bubble, followUps);
+        }
+
+        // 3. Render Message Actions (Sao chép & Tải Word) cho trợ lý
+        if (role === 'assistant' && !content.startsWith('⚠️ **Lỗi:')) {
+            renderMessageActions(bubble, 'Tư vấn Pháp lý', content, citations);
         }
 
         if (role === 'user') {
@@ -885,6 +1008,91 @@ document.addEventListener('DOMContentLoaded', () => {
         messagesList.appendChild(row);
         chatContainer.scrollTop = chatContainer.scrollHeight;
         return row;
+    }
+
+    function renderCitationsInsideBubble(bubble, citations, beforeElement = null) {
+        if (!citations || citations.length === 0) return;
+        const citeContainer = document.createElement('div');
+        citeContainer.className = 'law-citations-container';
+        citeContainer.innerHTML = `
+            <div class="law-citations-title">📚 CĂN CỨ PHÁP LÝ ĐỐI CHIẾU CHÍNH QUY (VBPL.VN):</div>
+            <div class="law-citations-list"></div>
+        `;
+        const citeList = citeContainer.querySelector('.law-citations-list');
+        citations.forEach(c => {
+            const badge = document.createElement('button');
+            badge.className = 'law-citation-badge';
+            badge.type = 'button';
+            const artTitle = c.article_title || c.title || c.law_name || 'Điều luật';
+            const artSrc = c.official_source || c.source || 'vbpl.vn';
+            badge.title = `Nhấn để xem nguyên văn ${c.article_number} (${c.law_name})`;
+            badge.innerHTML = `<span class="badge-icon">📖</span> <strong>${escapeHtml(c.article_number)}</strong>: ${escapeHtml(artTitle)} <span class="badge-source">${escapeHtml(artSrc)}</span>`;
+            badge.addEventListener('click', () => {
+                openLawModal(c);
+            });
+            citeList.appendChild(badge);
+        });
+
+        if (beforeElement && beforeElement.parentNode === bubble) {
+            bubble.insertBefore(citeContainer, beforeElement);
+        } else {
+            bubble.appendChild(citeContainer);
+        }
+    }
+
+    function renderFollowUpsInsideBubble(bubble, followUps) {
+        if (!followUps || followUps.length === 0) return;
+        const followUpContainer = document.createElement('div');
+        followUpContainer.className = 'follow-ups-container';
+        followUpContainer.innerHTML = `
+            <div class="follow-ups-title">💡 GỢI Ý BƯỚC TIẾP THEO DÀNH CHO BẠN:</div>
+            <div class="follow-ups-list"></div>
+        `;
+        const followUpList = followUpContainer.querySelector('.follow-ups-list');
+        followUps.forEach(prompt => {
+            const chip = document.createElement('button');
+            chip.className = 'follow-up-chip';
+            chip.type = 'button';
+            chip.innerHTML = `<span class="chip-icon">💬</span> <span>${escapeHtml(prompt)}</span>`;
+            chip.addEventListener('click', () => {
+                userInput.value = prompt;
+                userInput.style.height = 'auto';
+                userInput.style.height = Math.min(userInput.scrollHeight, 160) + 'px';
+                btnSend.disabled = false;
+                sendMessage();
+            });
+            followUpList.appendChild(chip);
+        });
+        bubble.appendChild(followUpContainer);
+    }
+
+    function renderMessageActions(bubble, topic, opinionText, citations = []) {
+        const actionsRow = document.createElement('div');
+        actionsRow.className = 'chat-msg-actions';
+
+        const btnCopy = document.createElement('button');
+        btnCopy.type = 'button';
+        btnCopy.className = 'btn-chat-action';
+        btnCopy.innerHTML = '📋 Sao chép';
+        btnCopy.title = 'Sao chép nội dung câu trả lời';
+        btnCopy.addEventListener('click', () => {
+            navigator.clipboard.writeText(opinionText);
+            btnCopy.innerHTML = '✅ Đã sao chép!';
+            setTimeout(() => btnCopy.innerHTML = '📋 Sao chép', 2000);
+        });
+
+        const btnDocx = document.createElement('button');
+        btnDocx.type = 'button';
+        btnDocx.className = 'btn-chat-action export-word';
+        btnDocx.innerHTML = '📥 Tải Word (.docx)';
+        btnDocx.title = 'Xuất ý kiến tư vấn pháp lý này ra file Word (.docx) chuyên nghiệp';
+        btnDocx.addEventListener('click', () => {
+            downloadChatDocx(topic, opinionText, citations);
+        });
+
+        actionsRow.appendChild(btnCopy);
+        actionsRow.appendChild(btnDocx);
+        bubble.appendChild(actionsRow);
     }
 
     function openLawModal(lawCitation) {

@@ -1,6 +1,10 @@
 import logging
+import re
+import mimetypes
+import unicodedata
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Query, Request, status
+from fastapi.responses import StreamingResponse, Response
 from backend.models.schemas import (
     ChatRequest,
     ChatResponse,
@@ -11,7 +15,9 @@ from backend.models.schemas import (
     CourtTurnResponse,
     VerdictRequest,
     VerdictResponse,
-    LawCitation
+    LawCitation,
+    ExportContractDocxRequest,
+    ExportChatDocxRequest
 )
 from backend.core.gemini_service import legal_service
 from backend.core.config import settings
@@ -19,6 +25,7 @@ from backend.core.legal_prompts import SUPPORTED_CATEGORIES
 from backend.core.court_prompts import PRESET_COURT_CASES
 from backend.core.contract_parser import contract_parser
 from backend.core.rag_engine import rag_engine
+from backend.core.doc_exporter import create_contract_review_docx, create_legal_opinion_docx
 from backend.core.security import (
     chat_limiter,
     upload_limiter,
@@ -113,6 +120,32 @@ async def legal_chat(request: ChatRequest, req: Request):
             detail="Hệ thống AI đang bận hoặc gặp sự cố tạm thời. Vui lòng thử lại sau giây lát."
         )
 
+@router.post("/chat/stream")
+async def legal_chat_stream(request: ChatRequest, req: Request):
+    """Tiếp nhận câu hỏi pháp lý và truyền luồng câu trả lời (Server-Sent Events) theo thời gian thực."""
+    # 1. Chống spam
+    chat_limiter.check_rate_limit(req)
+
+    # 2. Kiểm tra dữ liệu đầu vào
+    msg = request.message.strip()
+    if not msg:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nội dung câu hỏi không được để trống."
+        )
+    validate_message_length(msg)
+
+    return StreamingResponse(
+        legal_service.consult_legal_matter_stream(
+            message=msg,
+            history=request.history,
+            category=request.category,
+            custom_api_key=request.api_key,
+            model_override=request.model
+        ),
+        media_type="text/event-stream"
+    )
+
 # --- CONTRACT REVIEW ---
 
 @router.post("/review-contract", response_model=ContractReviewResponse)
@@ -141,14 +174,17 @@ async def review_contract(
         # 2. Kiểm tra định dạng và dung lượng file (< 10MB)
         validate_uploaded_file(filename, len(file_bytes))
         mime_type = file.content_type
+        if not mime_type or mime_type == "application/octet-stream":
+            guessed, _ = mimetypes.guess_type(filename)
+            mime_type = guessed or "application/octet-stream"
         
         try:
             extracted_text, is_scanned = contract_parser.extract_text_from_bytes(file_bytes, filename)
-            if is_scanned:
+            contract_text = extracted_text
+            # Nếu là file ảnh hoặc file PDF, lưu raw_bytes để Gemini Vision OCR trực tiếp
+            fn_lower = filename.lower()
+            if is_scanned or any(fn_lower.endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".webp", ".pdf"]):
                 raw_bytes = file_bytes
-                contract_text = extracted_text
-            else:
-                contract_text = extracted_text
         except ValueError as ve:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
 
@@ -188,6 +224,62 @@ async def review_contract(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Quá trình thẩm định gặp sự cố hoặc file bị lỗi cấu trúc. Vui lòng thử lại với file khác."
         )
+
+# --- EXPORT WORD (.DOCX) API ---
+
+def _slugify_filename(text: str, default: str = "document") -> str:
+    """Chuyển đổi tên file thành ký tự ASCII an toàn cho HTTP Header Content-Disposition."""
+    nfkd = unicodedata.normalize('NFKD', text)
+    ascii_text = ''.join([c for c in nfkd if not unicodedata.combining(c)]).replace('đ', 'd').replace('Đ', 'D')
+    clean = re.sub(r'[^a-zA-Z0-9_\-]', '_', ascii_text).strip('_')
+    return clean or default
+
+@router.post("/export-contract-docx")
+async def export_contract_docx(request: ExportContractDocxRequest, req: Request):
+    """Xuất Báo cáo Thẩm định Hợp đồng thành file Microsoft Word (.DOCX) chuẩn Luật sư."""
+    chat_limiter.check_rate_limit(req)
+    try:
+        bio = create_contract_review_docx(
+            analysis_text=request.analysis_text,
+            contract_title=request.contract_title,
+            protect_side=request.protect_side,
+            citations=request.citations
+        )
+        safe_title = _slugify_filename(request.contract_title, "Hop_dong")
+        filename = f"Bao_cao_tham_dinh_{safe_title[:30]}.docx"
+        return Response(
+            content=bio.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+    except Exception as e:
+        logger.exception(f"Lỗi khi xuất file Word hợp đồng: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Không thể tạo file Word. Vui lòng thử lại.")
+
+@router.post("/export-chat-docx")
+async def export_chat_docx(request: ExportChatDocxRequest, req: Request):
+    """Xuất Ý kiến Tư vấn Pháp lý thành Thư tư vấn Word (.DOCX) chuyên nghiệp."""
+    chat_limiter.check_rate_limit(req)
+    try:
+        bio = create_legal_opinion_docx(
+            topic=request.topic,
+            opinion_text=request.opinion_text,
+            citations=request.citations
+        )
+        safe_topic = _slugify_filename(request.topic, "Tu_van_phap_ly")
+        filename = f"Thu_tu_van_phap_ly_{safe_topic[:30]}.docx"
+        return Response(
+            content=bio.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+    except Exception as e:
+        logger.exception(f"Lỗi khi xuất file Word thư tư vấn: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Không thể tạo file Word. Vui lòng thử lại.")
 
 # --- PHIÊN TÒA GIẢ LẬP (MOOT COURT API) ---
 

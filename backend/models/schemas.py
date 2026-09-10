@@ -57,6 +57,20 @@ class ContractReviewResponse(BaseModel):
     disclaimer: str
     citations: List[LawCitation] = Field(default=[], description="Các điều luật liên quan trong hợp đồng")
 
+# --- DOCX EXPORT SCHEMAS ---
+
+class ExportContractDocxRequest(BaseModel):
+    analysis_text: str = Field(..., description="Nội dung kết quả thẩm định hợp đồng")
+    contract_title: str = Field(default="Hợp đồng kinh tế", description="Tên văn bản hợp đồng")
+    protect_side: str = Field(default="Toàn diện", description="Góc nhìn bảo vệ")
+    citations: Optional[List[dict]] = Field(default=None, description="Danh sách các điều luật đối chiếu")
+
+class ExportChatDocxRequest(BaseModel):
+    topic: str = Field(default="Tư vấn Pháp lý", description="Tiêu đề câu hỏi hoặc chủ đề tư vấn")
+    opinion_text: str = Field(..., description="Nội dung ý kiến tư vấn của luật sư AI")
+    citations: Optional[List[dict]] = Field(default=None, description="Danh sách các căn cứ pháp luật")
+
+
 # --- PHIÊN TÒA GIẢ LẬP SCHEMAS (MOOT COURT) ---
 
 class CourtTurnMessage(BaseModel):
