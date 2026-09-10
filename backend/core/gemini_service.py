@@ -27,6 +27,13 @@ from backend.core.court_prompts import (
     OPPOSING_COUNSEL_INSTRUCTION,
     VERDICT_SYSTEM_INSTRUCTION
 )
+from backend.core.petition_templates import (
+    PETITION_SYSTEM_PROMPT,
+    PETITION_TYPES
+)
+from backend.core.negotiation_prompts import (
+    NEGOTIATION_COACH_SYSTEM_INSTRUCTION
+)
 from backend.core.rag_engine import rag_engine
 from backend.models.schemas import (
     ChatMessage,
@@ -35,7 +42,13 @@ from backend.models.schemas import (
     CourtTurnMessage,
     CourtTurnResponse,
     VerdictResponse,
-    LawCitation
+    LawCitation,
+    NegotiationTurnResponse,
+    EvidenceAuditResponse,
+    EvidenceAuditItem,
+    PetitionGenerateResponse,
+    CorporateAuditResponse,
+    CorporatePillarAudit
 )
 
 logger = logging.getLogger("ai_lawyer.gemini")
@@ -660,5 +673,346 @@ class GeminiLegalService:
         except Exception as e:
             logger.error(f"Lỗi tuyên án: {str(e)}")
             raise RuntimeError(f"Lỗi khi ban hành phán quyết: {str(e)}")
+
+    async def simulate_negotiation_turn(
+        self,
+        scenario_title: str,
+        user_role: str,
+        opponent_role: str,
+        context: str,
+        user_message: str,
+        dialogue_history: List[Dict[str, str]],
+        custom_api_key: Optional[str] = None,
+        model_override: Optional[str] = None
+    ) -> NegotiationTurnResponse:
+        """Mô phỏng lượt đối chất thương lượng và nhận xét chiến thuật."""
+        client = self._get_client(custom_api_key)
+        model_name = self._resolve_model(model_override)
+
+        history_text = ""
+        for msg in dialogue_history:
+            spk = msg.get("speaker", "user") if isinstance(msg, dict) else getattr(msg, "speaker", "user")
+            txt = msg.get("text", "") if isinstance(msg, dict) else getattr(msg, "text", "")
+            lbl = "BẠN" if spk == "user" else "ĐỐI PHƯƠNG"
+            history_text += f"[{lbl}]: {txt}\n"
+
+        prompt = (
+            f"=== BỐI CẢNH ĐÀM PHÁN & TRANH CHẤP ===\n"
+            f"Chủ đề: {scenario_title}\n"
+            f"Tư cách của bạn (Người dùng): {user_role}\n"
+            f"Đối phương cần thương lượng: {opponent_role}\n"
+            f"Bối cảnh cụ thể: {context}\n\n"
+            f"=== LỊCH SỬ THƯƠNG LƯỢNG TRƯỚC ĐÓ ===\n{history_text or '(Chưa có cuộc trò chuyện trước đó)'}\n\n"
+            f"=== LƯỢT PHÁT BIỂU MỚI NHẤT CỦA BẠN ===\n\"{user_message}\"\n\n"
+            f"Hãy phản hồi theo đúng cấu trúc của NEGOTIATION_COACH_SYSTEM_INSTRUCTION:\n"
+            f"[ĐỐI PHƯƠNG PHẢN HỒI]: <nội dung đối phương nói>\n"
+            f"[NHẬN XÉT CHIẾN THUẬT]: <phân tích điểm hớ, mách nước chiêu cờ, câu thoại mẫu gợi ý>\n"
+            f"SCORE: <con số từ 0 đến 100>"
+        )
+
+        contents = [types.Content(role="user", parts=[types.Part.from_text(text=prompt)])]
+        config = types.GenerateContentConfig(
+            system_instruction=NEGOTIATION_COACH_SYSTEM_INSTRUCTION,
+            temperature=0.35,
+            top_p=0.95,
+        )
+
+        try:
+            response, used_model = self._generate_with_fallback(
+                client=client,
+                primary_model=model_name,
+                contents=contents,
+                config=config,
+            )
+            raw_text = response.text or ""
+
+            opponent_reply = "Tôi ghi nhận ý kiến của bạn nhưng chúng ta cần thỏa thuận lại."
+            tactical_analysis = ""
+            score = 50
+            recommended_counter = ""
+
+            opp_match = re.search(r"\[ĐỐI PHƯƠNG PHẢN HỒI\]:\s*(.*?)(?=\[NHẬN XÉT CHIẾN THUẬT\]|SCORE:|$)", raw_text, re.DOTALL)
+            if opp_match:
+                opponent_reply = opp_match.group(1).strip()
+
+            tac_match = re.search(r"\[NHẬN XÉT CHIẾN THUẬT\]:\s*(.*?)(?=SCORE:|$)", raw_text, re.DOTALL)
+            if tac_match:
+                tactical_analysis = tac_match.group(1).strip()
+
+            score_match = re.search(r"SCORE:\s*(\d+)", raw_text)
+            if score_match:
+                score = min(100, max(0, int(score_match.group(1))))
+
+            counter_match = re.search(r"Câu thoại mẫu gợi ý cho bạn:[\s*]*[\"“](.*?)[\"”]", tactical_analysis, re.DOTALL)
+            if counter_match:
+                recommended_counter = counter_match.group(1).strip()
+
+            return NegotiationTurnResponse(
+                opponent_reply=opponent_reply,
+                tactical_analysis=tactical_analysis,
+                deal_readiness_score=score,
+                recommended_counter=recommended_counter,
+                model_used=used_model
+            )
+        except Exception as e:
+            logger.error(f"Lỗi đàm phán: {str(e)}")
+            raise RuntimeError(f"Lỗi trong quá trình huấn luyện đàm phán: {str(e)}")
+
+    async def audit_evidence_items(
+        self,
+        case_summary: str,
+        evidence_items: List[str],
+        custom_api_key: Optional[str] = None,
+        model_override: Optional[str] = None
+    ) -> EvidenceAuditResponse:
+        """Thẩm tra sức nặng và tính pháp lý của từng tài liệu chứng cứ."""
+        client = self._get_client(custom_api_key)
+        model_name = self._resolve_model(model_override)
+
+        evidence_str = "\n".join([f"- {i+1}. {item}" for i, item in enumerate(evidence_items)])
+
+        prompt = (
+            f"=== THẨM TRA VÀ ĐÁNH GIÁ SỨC NẶNG CHỨNG CỨ TỐ TỤNG ===\n"
+            f"Tóm tắt vụ án / Yêu cầu tranh chấp:\n{case_summary}\n\n"
+            f"Danh sách tài liệu, chứng cứ hiện có:\n{evidence_str}\n\n"
+            f"Yêu cầu: Dựa trên Bộ luật Tố tụng Dân sự 2015 (Điều 86-97) và Bộ luật Tố tụng Hình sự 2015, "
+            f"hãy thẩm định 3 thuộc tính: Tính khách quan, Tính hợp pháp, Tính liên quan.\n"
+            f"Xếp loại từng chứng cứ theo thang điểm: A+ (Vàng/Tuyệt đối), A (Mạnh), B (Bổ trợ), C (Yếu), F (Không giá trị/Bất hợp pháp).\n"
+            f"Nêu rõ sơ hở dễ bị bác bỏ và giải pháp khắc phục (lập vi bằng Thừa phát lại, đề nghị Tòa thu thập chứng cứ, công chứng, sao kê có dấu...). \n"
+            f"CHỈ TRẢ VỀ JSON HỢP LỆ (KHÔNG THÊM LỜI GIẢI THÍCH NGOÀI JSON) theo cấu trúc:\n"
+            f"{{\n"
+            f'  "overall_strength": "Vững chắc / Khá / Yếu / Cần bổ sung khẩn cấp",\n'
+            f'  "average_grade": "A",\n'
+            f'  "items": [\n'
+            f'    {{\n'
+            f'      "item": "Tên chứng cứ",\n'
+            f'      "grade": "A",\n'
+            f'      "probative_value": "Mô tả giá trị chứng minh",\n'
+            f'      "vulnerability": "Sơ hở, rủi ro bị bác bỏ",\n'
+            f'      "remedy": "Biện pháp củng cố / lập vi bằng / công chứng cụ thể"\n'
+            f'    }}\n'
+            f'  ],\n'
+            f'  "general_recommendations": "Chiến thuật củng cố hồ sơ chứng cứ tổng thể"\n'
+            f"}}"
+        )
+
+        contents = [types.Content(role="user", parts=[types.Part.from_text(text=prompt)])]
+        config = types.GenerateContentConfig(
+            system_instruction="Bạn là Chuyên gia Giám định & Thẩm tra Chứng cứ Tố tụng hàng đầu Việt Nam thuộc Văn phòng Luật sư Huỳnh Nguyên Khang. Luôn phản hồi JSON hợp lệ.",
+            temperature=0.2,
+            top_p=0.95,
+        )
+
+        try:
+            response, used_model = self._generate_with_fallback(
+                client=client,
+                primary_model=model_name,
+                contents=contents,
+                config=config,
+            )
+            raw = (response.text or "").strip()
+            if raw.startswith("```json"):
+                raw = raw[7:]
+            elif raw.startswith("```"):
+                raw = raw[3:]
+            if raw.endswith("```"):
+                raw = raw[:-3]
+            raw = raw.strip()
+
+            data = json.loads(raw)
+            items_list = [
+                EvidenceAuditItem(
+                    item=it.get("item", "Chứng cứ"),
+                    grade=it.get("grade", "B"),
+                    probative_value=it.get("probative_value", "Có giá trị tham khảo"),
+                    vulnerability=it.get("vulnerability", "Chưa được công chứng hoặc lập vi bằng"),
+                    remedy=it.get("remedy", "Lập vi bằng Thừa phát lại")
+                )
+                for it in data.get("items", [])
+            ]
+
+            return EvidenceAuditResponse(
+                success=True,
+                overall_strength=data.get("overall_strength", "Cần củng cố"),
+                average_grade=data.get("average_grade", "B"),
+                items=items_list,
+                general_recommendations=data.get("general_recommendations", "Cần liên hệ Thừa phát lại hoặc đề nghị Tòa án thu thập chứng cứ để hoàn thiện hồ sơ."),
+                model_used=used_model
+            )
+        except Exception as e:
+            logger.error(f"Lỗi thẩm tra chứng cứ: {str(e)}")
+            raise RuntimeError(f"Không thể thẩm tra chứng cứ: {str(e)}")
+
+    async def generate_legal_petition(
+        self,
+        petition_type: str,
+        plaintiff_info: dict,
+        defendant_info: dict,
+        facts: str,
+        claims: str,
+        evidence_list: Optional[str] = "",
+        custom_api_key: Optional[str] = None,
+        model_override: Optional[str] = None
+    ) -> PetitionGenerateResponse:
+        """Soạn thảo văn bản tố tụng hoặc hành chính chuẩn mẫu biểu Việt Nam."""
+        client = self._get_client(custom_api_key)
+        model_name = self._resolve_model(model_override)
+
+        pet_meta = next((p for p in PETITION_TYPES if p["id"] == petition_type), None)
+        title = pet_meta["name"] if pet_meta else "ĐƠN KHỞI KIỆN / TỐ TỤNG"
+        standard_form = pet_meta["standard_form"] if pet_meta else "Theo mẫu chuẩn"
+        agency = pet_meta["agency"] if pet_meta else "Cơ quan có thẩm quyền"
+
+        rag_query = f"{title} {facts[:200]} {claims[:200]}"
+        rag_hits = rag_engine.search(rag_query, top_k=4)
+        rag_context = ""
+        if rag_hits:
+            rag_context = "\n=== CĂN CỨ PHÁP LUẬT CHÍNH THỨC ĐỐI CHIẾU ===\n" + "\n".join([
+                f"- Điều {h['article_number']} ({h['law_name']}): {h['article_title']}\n  Trích: {h['content'][:150]}..."
+                for h in rag_hits
+            ])
+
+        prompt = (
+            f"=== LỆNH SOẠN THẢO VĂN BẢN TỐ TỤNG / HÀNH CHÍNH ===\n"
+            f"Loại văn bản: {title}\n"
+            f"Biểu mẫu áp dụng: {standard_form}\n"
+            f"Cơ quan kính gửi giải quyết: {agency}\n\n"
+            f"=== THÔNG TIN BÊN LÀM ĐƠN / NGUYÊN ĐƠN ===\n"
+            f"Họ và tên: {plaintiff_info.get('name', '...')}\n"
+            f"Số CCCD/Căn cước: {plaintiff_info.get('id_number', '...')}\n"
+            f"Địa chỉ thường trú / Nơi ở hiện tại: {plaintiff_info.get('address', '...')}\n"
+            f"Số điện thoại liên hệ: {plaintiff_info.get('phone', '...')}\n\n"
+            f"=== THÔNG TIN BÊN BỊ ĐƠN / BÊN BỊ TỐ CÁO / BÊN NHẬN THÔNG BÁO ===\n"
+            f"Họ và tên / Tên tổ chức: {defendant_info.get('name', '...')}\n"
+            f"Địa chỉ / Trụ sở: {defendant_info.get('address', '...')}\n"
+            f"Số điện thoại (nếu có): {defendant_info.get('phone', '...')}\n\n"
+            f"=== TÓM TẮT DIỄN BIẾN SỰ VIỆC ===\n{facts}\n\n"
+            f"=== NỘI DUNG YÊU CẦU GIẢI QUYẾT ===\n{claims}\n\n"
+            f"=== TÀI LIỆU, CHỨNG CỨ KÈM THEO ===\n{evidence_list or 'Bản sao CCCD, Hợp đồng, Giấy tờ chuyển khoản, Vi bằng...'}\n"
+            f"{rag_context}\n\n"
+            f"Hãy soạn thảo hoàn chỉnh toàn văn bản đơn theo đúng chuẩn thể thức văn bản hành chính Việt Nam (Nghị quyết 01/2017/NQ-HĐTP và Nghị định 30/2020/NĐ-CP). "
+            f"Văn phong nghiêm trang, đanh thép, viện dẫn chính xác các điều luật có hiệu lực mới nhất."
+        )
+
+        contents = [types.Content(role="user", parts=[types.Part.from_text(text=prompt)])]
+        config = types.GenerateContentConfig(
+            system_instruction=PETITION_SYSTEM_PROMPT,
+            temperature=0.2,
+            top_p=0.95,
+        )
+
+        try:
+            response, used_model = self._generate_with_fallback(
+                client=client,
+                primary_model=model_name,
+                contents=contents,
+                config=config,
+            )
+            return PetitionGenerateResponse(
+                success=True,
+                petition_type=petition_type,
+                petition_title=title,
+                content_markdown=response.text or "Không thể tạo nội dung đơn từ.",
+                model_used=used_model,
+                disclaimer=LEGAL_DISCLAIMER
+            )
+        except Exception as e:
+            logger.error(f"Lỗi tạo đơn: {str(e)}")
+            raise RuntimeError(f"Không thể soạn thảo đơn pháp lý: {str(e)}")
+
+    async def audit_corporate_compliance(
+        self,
+        company_name: str,
+        business_type: str,
+        employee_count: int,
+        industry: str,
+        compliance_notes: str,
+        custom_api_key: Optional[str] = None,
+        model_override: Optional[str] = None
+    ) -> CorporateAuditResponse:
+        """Khám sức khỏe pháp chế doanh nghiệp theo 8 trụ cột pháp lý 2026."""
+        client = self._get_client(custom_api_key)
+        model_name = self._resolve_model(model_override)
+
+        prompt = (
+            f"=== KHÁM SỨC KHỎE PHÁP CHẾ DOANH NGHIỆP 2026 ===\n"
+            f"Tên doanh nghiệp: {company_name}\n"
+            f"Mô hình công ty: {business_type}\n"
+            f"Quy mô nhân sự: {employee_count} nhân sự\n"
+            f"Ngành nghề kinh doanh: {industry}\n"
+            f"Ghi chú tình trạng hiện tại: {compliance_notes}\n\n"
+            f"Hãy thẩm định toàn diện rủi ro pháp lý theo đúng 8 TRỤ CỘT PHÁP CHẾ:\n"
+            f"1. legal_entity (Pháp nhân & Giấy phép con - Luật Doanh nghiệp 2020)\n"
+            f"2. labor_social (Lao động, Tiền lương & BHXH - BLLĐ 2019, Luật BHXH 2024 hiệu lực 2025)\n"
+            f"3. contracts (Hợp đồng & Đối tác - BLDS 2015, Luật Thương mại 2005)\n"
+            f"4. ip_brand (Sở hữu trí tuệ, Nhãn hiệu & Bí mật kinh doanh - Luật SHTT 2022)\n"
+            f"5. tax_invoice (Thuế & Hóa đơn điện tử - Luật QLTH, NĐ 123/2020/NĐ-CP)\n"
+            f"6. fire_environment (PCCC & Giấy phép Môi trường - Luật PCCC 2024, Luật BVMT 2020)\n"
+            f"7. data_privacy (Bảo vệ dữ liệu cá nhân - Nghị định 13/2023/NĐ-CP)\n"
+            f"8. cyber_ecommerce (TMĐT & Bản quyền số - Nghị định 52/2013, NĐ 85/2021)\n\n"
+            f"CHỈ TRẢ VỀ JSON HỢP LỆ THEO CẤU TRÚC (status nhận 'compliant', 'warning', hoặc 'critical'):\n"
+            f"{{\n"
+            f'  "compliance_score": 75,\n'
+            f'  "summary": "Tóm tắt tình trạng tuân thủ pháp luật tổng quan",\n'
+            f'  "pillars": [\n'
+            f'    {{\n'
+            f'      "pillar_id": "legal_entity",\n'
+            f'      "pillar_name": "Pháp nhân & Giấy phép con",\n'
+            f'      "status": "warning",\n'
+            f'      "risk_summary": "Rủi ro phát hiện",\n'
+            f'      "remediation_action": "Phương án khắc phục khẩn cấp",\n'
+            f'      "legal_basis": "Điều ... Luật ..."\n'
+            f'    }}\n'
+            f'  ]\n'
+            f"}}"
+        )
+
+        contents = [types.Content(role="user", parts=[types.Part.from_text(text=prompt)])]
+        config = types.GenerateContentConfig(
+            system_instruction="Bạn là Giám đốc Pháp chế Cấp cao thuộc Văn phòng Cố vấn Pháp lý Huỳnh Nguyên Khang. Luôn thẩm định chuẩn xác và trả về JSON hợp lệ.",
+            temperature=0.2,
+            top_p=0.95,
+        )
+
+        try:
+            response, used_model = self._generate_with_fallback(
+                client=client,
+                primary_model=model_name,
+                contents=contents,
+                config=config,
+            )
+            raw = (response.text or "").strip()
+            if raw.startswith("```json"):
+                raw = raw[7:]
+            elif raw.startswith("```"):
+                raw = raw[3:]
+            if raw.endswith("```"):
+                raw = raw[:-3]
+            raw = raw.strip()
+
+            data = json.loads(raw)
+            pillars_list = [
+                CorporatePillarAudit(
+                    pillar_id=p.get("pillar_id", "pillar"),
+                    pillar_name=p.get("pillar_name", "Trụ cột pháp lý"),
+                    status=p.get("status", "warning"),
+                    risk_summary=p.get("risk_summary", "Cần rà soát"),
+                    remediation_action=p.get("remediation_action", "Cập nhật hồ sơ"),
+                    legal_basis=p.get("legal_basis", "Quy định pháp luật hiện hành")
+                )
+                for p in data.get("pillars", [])
+            ]
+
+            return CorporateAuditResponse(
+                success=True,
+                company_name=company_name,
+                compliance_score=data.get("compliance_score", 70),
+                summary=data.get("summary", "Đã hoàn thành rà soát pháp chế doanh nghiệp."),
+                pillars=pillars_list,
+                model_used=used_model
+            )
+        except Exception as e:
+            logger.error(f"Lỗi khám sức khỏe pháp chế: {str(e)}")
+            raise RuntimeError(f"Không thể thẩm định pháp chế doanh nghiệp: {str(e)}")
 
 legal_service = GeminiLegalService()

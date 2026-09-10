@@ -106,3 +106,134 @@ class VerdictResponse(BaseModel):
     success: bool
     verdict_markdown: str
     model_used: str
+
+class ExportVerdictDocxRequest(BaseModel):
+    case_title: str
+    user_role: str
+    verdict_markdown: str
+    dialogue_history: Optional[List[CourtTurnMessage]] = []
+
+# --- LEGAL CALCULATOR SCHEMAS ---
+
+class LegalCalculationRequest(BaseModel):
+    calc_type: str = Field(..., description="'court_fee', 'late_interest', 'property_tax', hoặc 'severance_allowance'")
+    amount: Optional[float] = Field(default=0.0, description="Giá ngạch tranh chấp (cho án phí)")
+    dispute_type: Optional[str] = Field(default="civil", description="'civil', 'economic', hoặc 'administrative'")
+    has_valuation: Optional[bool] = Field(default=True, description="Có giá ngạch hay không")
+    principal: Optional[float] = Field(default=0.0, description="Số tiền nợ gốc chậm trả")
+    start_date: Optional[str] = Field(default="", description="Ngày bắt đầu chậm trả (YYYY-MM-DD)")
+    end_date: Optional[str] = Field(default="", description="Ngày thanh toán / chốt nợ (YYYY-MM-DD)")
+    rate_percent_per_year: Optional[float] = Field(default=None, description="Lãi suất thỏa thuận (%/năm)")
+    price: Optional[float] = Field(default=0.0, description="Giá trị chuyển nhượng bất động sản")
+    is_first_home: Optional[bool] = Field(default=False, description="Miễn thuế BĐS duy nhất")
+    salary: Optional[float] = Field(default=0.0, description="Mức lương bình quân 6 tháng liền kề")
+    working_years: Optional[float] = Field(default=0.0, description="Số năm làm việc thực tế tính trợ cấp")
+
+class LegalCalculationResponse(BaseModel):
+    success: bool
+    title: str
+    result_details: dict
+    legal_basis: str
+    summary_text: str
+
+# --- PETITION GENERATOR SCHEMAS ---
+
+class PetitionGenerateRequest(BaseModel):
+    petition_type: str = Field(..., description="'civil_lawsuit', 'criminal_report', 'mutual_divorce', 'debt_notice', 'admin_complaint'")
+    plaintiff_info: dict = Field(..., description="Thông tin người làm đơn / nguyên đơn (họ tên, CCCD, địa chỉ, sđt)")
+    defendant_info: dict = Field(..., description="Thông tin người bị kiện / bị tố cáo")
+    facts: str = Field(..., description="Tóm tắt diễn biến sự việc theo thời gian")
+    claims: str = Field(..., description="Các yêu cầu đề nghị giải quyết")
+    evidence_list: Optional[str] = Field(default="", description="Danh mục chứng cứ kèm theo")
+    api_key: Optional[str] = None
+    model: Optional[str] = None
+
+class PetitionGenerateResponse(BaseModel):
+    success: bool
+    petition_type: str
+    petition_title: str
+    content_markdown: str
+    model_used: str
+    disclaimer: str
+
+class ExportPetitionDocxRequest(BaseModel):
+    petition_title: str
+    content_markdown: str
+
+# --- NEGOTIATION COACH SCHEMAS ---
+
+class NegotiationTurnRequest(BaseModel):
+    scenario_title: str
+    user_role: str
+    opponent_role: str
+    context: str
+    user_message: str
+    dialogue_history: List[dict] = Field(default=[])
+    api_key: Optional[str] = None
+    model: Optional[str] = None
+
+class NegotiationTurnResponse(BaseModel):
+    opponent_reply: str
+    tactical_analysis: str
+    deal_readiness_score: int
+    recommended_counter: str
+    model_used: str
+
+# --- EVIDENCE AUDITOR SCHEMAS ---
+
+class EvidenceAuditRequest(BaseModel):
+    case_summary: str = Field(..., description="Tóm tắt tình huống và yêu cầu khởi kiện")
+    evidence_items: List[str] = Field(..., description="Danh sách các tài liệu, chứng cứ hiện có")
+    api_key: Optional[str] = None
+    model: Optional[str] = None
+
+class EvidenceAuditItem(BaseModel):
+    item: str
+    grade: str
+    probative_value: str
+    vulnerability: str
+    remedy: str
+
+class EvidenceAuditResponse(BaseModel):
+    success: bool
+    overall_strength: str
+    average_grade: str
+    items: List[EvidenceAuditItem]
+    general_recommendations: str
+    model_used: str
+
+# --- CORPORATE COMPLIANCE AUDIT SCHEMAS ---
+
+class CorporateAuditRequest(BaseModel):
+    company_name: str
+    business_type: str
+    employee_count: int
+    industry: str
+    compliance_notes: str
+    api_key: Optional[str] = None
+    model: Optional[str] = None
+
+class CorporatePillarAudit(BaseModel):
+    pillar_id: str
+    pillar_name: str
+    status: str
+    risk_summary: str
+    remediation_action: str
+    legal_basis: str
+
+class CorporateAuditResponse(BaseModel):
+    success: bool
+    company_name: str
+    compliance_score: int
+    summary: str
+    pillars: List[CorporatePillarAudit]
+    model_used: str
+
+class ExportCorporateAuditDocxRequest(BaseModel):
+    company_name: str
+    business_type: str
+    industry: str
+    compliance_score: int
+    summary: str
+    pillars: List[dict]
+

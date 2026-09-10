@@ -417,3 +417,173 @@ def create_legal_opinion_docx(
     doc.save(bio)
     bio.seek(0)
     return bio
+
+def create_court_verdict_docx(
+    case_title: str,
+    user_role: str,
+    verdict_markdown: str,
+    dialogue_history: Optional[List[Any]] = None
+) -> io.BytesIO:
+    """Tạo file Word Bản án Sơ bộ & Biên bản Tranh tụng Tòa án."""
+    doc = docx.Document()
+
+    for s in doc.sections:
+        s.top_margin = Inches(0.8)
+        s.bottom_margin = Inches(0.8)
+        s.left_margin = Inches(0.8)
+        s.right_margin = Inches(0.8)
+
+    _add_header_banner(doc)
+
+    p_title = doc.add_paragraph()
+    p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_title.paragraph_format.space_before = Pt(6)
+    p_title.paragraph_format.space_after = Pt(2)
+    r_title = p_title.add_run("BẢN ÁN SƠ BỘ VÀ BIÊN BẢN TRANH TỤNG TÒA ÁN")
+    r_title.font.bold = True
+    r_title.font.size = Pt(14)
+    r_title.font.color.rgb = COLOR_NAVY
+
+    p_sub = doc.add_paragraph()
+    p_sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_sub.paragraph_format.space_after = Pt(14)
+    r_sub = p_sub.add_run(f"Vụ án: {case_title}  |  Tư cách: {user_role}")
+    r_sub.font.bold = True
+    r_sub.font.size = Pt(10)
+    r_sub.font.color.rgb = COLOR_GOLD
+
+    # Nội dung phán quyết của Hội Đồng Xét Xử
+    _add_markdown_content_to_doc(doc, verdict_markdown)
+
+    # Biên bản đối chất tranh tụng
+    if dialogue_history and len(dialogue_history) > 0:
+        p_sec = doc.add_paragraph()
+        p_sec.paragraph_format.space_before = Pt(16)
+        p_sec.paragraph_format.space_after = Pt(6)
+        r_sec = p_sec.add_run("--- BIÊN BẢN ĐỐI CHẤT TRANH TỤNG TẠI PHIÊN TÒA ---")
+        r_sec.font.bold = True
+        r_sec.font.size = Pt(11.5)
+        r_sec.font.color.rgb = COLOR_NAVY
+
+        for msg in dialogue_history:
+            speaker = getattr(msg, 'speaker', '') if hasattr(msg, 'speaker') else msg.get('speaker', '')
+            text = getattr(msg, 'text', '') if hasattr(msg, 'text') else msg.get('text', '')
+            label = "BẠN" if speaker == 'user' else ("LUẬT SƯ ĐỐI TỤNG" if speaker == 'opposing' else "THẨM PHÁN")
+            color = COLOR_GOLD if speaker == 'user' else (COLOR_RED if speaker == 'opposing' else COLOR_NAVY)
+
+            p_turn = doc.add_paragraph()
+            p_turn.paragraph_format.space_before = Pt(4)
+            p_turn.paragraph_format.space_after = Pt(4)
+            r_spk = p_turn.add_run(f"[{label}]: ")
+            r_spk.font.bold = True
+            r_spk.font.color.rgb = color
+            r_txt = p_turn.add_run(text)
+            r_txt.font.size = Pt(10)
+
+    _add_footer_disclaimer(doc)
+
+    bio = io.BytesIO()
+    doc.save(bio)
+    bio.seek(0)
+    return bio
+
+def create_petition_docx(
+    petition_title: str,
+    petition_markdown: str
+) -> io.BytesIO:
+    """Tạo file Word Đơn Khởi Kiện / Đơn Tố Tụng chuẩn thể thức Nghị định 30/2020."""
+    doc = docx.Document()
+
+    for s in doc.sections:
+        s.top_margin = Inches(0.8)
+        s.bottom_margin = Inches(0.8)
+        s.left_margin = Inches(0.9)  # Lề trái chuẩn 30mm cho đơn từ
+        s.right_margin = Inches(0.7)
+
+    # Quốc hiệu và Tiêu ngữ chuẩn văn bản hành chính Việt Nam
+    p_qh = doc.add_paragraph()
+    p_qh.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_qh.paragraph_format.space_after = Pt(2)
+    r1 = p_qh.add_run("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n")
+    r1.font.bold = True
+    r1.font.size = Pt(12)
+    r2 = p_qh.add_run("Độc lập - Tự do - Hạnh phúc\n")
+    r2.font.bold = True
+    r2.font.size = Pt(12.5)
+    r3 = p_qh.add_run("--------------------------")
+    r3.font.size = Pt(10)
+
+    # Tiêu đề đơn
+    p_t = doc.add_paragraph()
+    p_t.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_t.paragraph_format.space_before = Pt(12)
+    p_t.paragraph_format.space_after = Pt(14)
+    r_t = p_t.add_run(petition_title.upper())
+    r_t.font.bold = True
+    r_t.font.size = Pt(14)
+    r_t.font.color.rgb = COLOR_NAVY
+
+    _add_markdown_content_to_doc(doc, petition_markdown)
+
+    # Phần chữ ký người làm đơn
+    p_sig = doc.add_paragraph()
+    p_sig.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p_sig.paragraph_format.space_before = Pt(20)
+    p_sig.paragraph_format.space_after = Pt(2)
+    r_date = p_sig.add_run(f"......, Ngày {datetime.now().day} tháng {datetime.now().month} năm {datetime.now().year}\n")
+    r_date.font.italic = True
+    r_sign = p_sig.add_run("NGƯỜI LÀM ĐƠN\n")
+    r_sign.font.bold = True
+    r_note = p_sig.add_run("(Ký và ghi rõ họ tên)")
+    r_note.font.italic = True
+    r_note.font.size = Pt(9.5)
+
+    _add_footer_disclaimer(doc)
+
+    bio = io.BytesIO()
+    doc.save(bio)
+    bio.seek(0)
+    return bio
+
+def create_corporate_audit_docx(
+    company_name: str,
+    business_type: str,
+    audit_markdown: str
+) -> io.BytesIO:
+    """Tạo file Word Báo Cáo Khám Sức Khỏe Pháp Chế Doanh Nghiệp."""
+    doc = docx.Document()
+
+    for s in doc.sections:
+        s.top_margin = Inches(0.8)
+        s.bottom_margin = Inches(0.8)
+        s.left_margin = Inches(0.8)
+        s.right_margin = Inches(0.8)
+
+    _add_header_banner(doc)
+
+    p_title = doc.add_paragraph()
+    p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_title.paragraph_format.space_before = Pt(6)
+    p_title.paragraph_format.space_after = Pt(2)
+    r_title = p_title.add_run("BÁO CÁO KHÁM SỨC KHỎE PHÁP CHẾ DOANH NGHIỆP")
+    r_title.font.bold = True
+    r_title.font.size = Pt(14)
+    r_title.font.color.rgb = COLOR_NAVY
+
+    p_sub = doc.add_paragraph()
+    p_sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_sub.paragraph_format.space_after = Pt(14)
+    r_sub = p_sub.add_run(f"Doanh nghiệp: {company_name}  |  Hình thức: {business_type}")
+    r_sub.font.bold = True
+    r_sub.font.size = Pt(10)
+    r_sub.font.color.rgb = COLOR_GOLD
+
+    _add_markdown_content_to_doc(doc, audit_markdown)
+
+    _add_footer_disclaimer(doc)
+
+    bio = io.BytesIO()
+    doc.save(bio)
+    bio.seek(0)
+    return bio
+

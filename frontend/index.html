@@ -26,7 +26,7 @@
                     </div>
                 </div>
 
-                <!-- 3 Chế độ hoạt động chính -->
+                <!-- Chế độ hoạt động chính -->
                 <div class="nav-modes">
                     <button class="nav-mode-btn active" id="mode-chat" data-mode="chat">
                         <span class="icon">💬</span>
@@ -41,6 +41,21 @@
                         <span class="icon">🔨</span>
                         <span>Phiên Tòa Giả Lập</span>
                         <span class="badge-live">LIVE</span>
+                    </button>
+                    <button class="nav-mode-btn" id="mode-negotiate" data-mode="negotiate">
+                        <span class="icon">🤝</span>
+                        <span>Huấn Luyện Đàm Phán</span>
+                        <span class="badge-pro">COACH</span>
+                    </button>
+                    <button class="nav-mode-btn" id="mode-petition" data-mode="petition">
+                        <span class="icon">✍️</span>
+                        <span>Soạn Thảo Đơn Từ</span>
+                        <span class="badge-pro">MẪU 23-DS</span>
+                    </button>
+                    <button class="nav-mode-btn" id="mode-auditor" data-mode="auditor">
+                        <span class="icon">🛡️</span>
+                        <span>Thẩm Tra & Pháp Chế</span>
+                        <span class="badge-pro">AUDIT</span>
                     </button>
                 </div>
 
@@ -103,7 +118,12 @@
                     <span>🛡️</span>
                     <span>Huỳnh Nguyên Khang — Chuyên Trị Mọi Rủi Ro | Người tạo: Bố Bảo</span>
                 </div>
-                <div class="top-right"></div>
+                <div class="top-right">
+                    <button class="btn-top-calc" id="btn-open-calc" title="Bộ tiện ích tính án phí, lãi chậm trả, thuế BĐS, thôi việc">
+                        <span class="calc-icon">🧮</span>
+                        <span class="calc-label">Tính Toán Pháp Lý</span>
+                    </button>
+                </div>
             </header>
 
             <!-- VIEW 1: CHAT TƯ VẤN PHÁP LÝ (TÍCH HỢP RAG) -->
@@ -165,6 +185,7 @@
                     <div class="composer-box">
                         <button class="btn-attach" id="btn-chat-attach" title="Gửi nhanh file hợp đồng để rà soát">📎</button>
                         <input type="file" id="chat-file-input" style="display:none;" accept=".pdf,.docx,.txt,.png,.jpg,.jpeg">
+                        <button class="btn-voice" id="btn-voice-input" title="Nhập liệu bằng giọng nói Tiếng Việt (Microphone)">🎙️</button>
                         <textarea 
                             id="user-input" 
                             class="composer-textarea" 
@@ -366,13 +387,484 @@
                         </div>
                         <div class="verdict-body markdown-content" id="verdict-content"></div>
                         <div class="verdict-footer">
+                            <button class="btn-action btn-export-docx" id="btn-export-verdict-docx" title="Xuất Bản Án ra file Word (.docx) chuẩn Tòa án">📥 Tải Bản Án Word (.docx)</button>
                             <button class="btn-action" id="btn-copy-verdict">📋 Sao chép Bản Án</button>
                             <button class="btn-primary" id="btn-replay-court">🔄 Tranh Tụng Lại</button>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <!-- VIEW 4: HUẤN LUYỆN VIÊN ĐÀM PHÁN & HÒA GIẢI GIẢ LẬP -->
+            <div class="view-panel" id="view-negotiate">
+                <div class="negotiate-container">
+                    <div class="negotiate-setup-card" id="negotiate-setup-card">
+                        <div class="negotiate-badge">TACTICAL NEGOTIATION COACH</div>
+                        <h2 class="negotiate-title">Huấn Luyện Viên Đàm Phán & Hòa Giải Giả Lập</h2>
+                        <p class="negotiate-desc">
+                            Thực hành đối thoại thương lượng thu hồi nợ, đàm phán hợp đồng, tranh chấp tiền cọc hoặc ly hôn. 
+                            AI đóng vai đối tác sắc sảo và <strong>Cố vấn Huỳnh Nguyên Khang</strong> chấm điểm, soi lỗ hổng, mách nước chiêu cờ tiếp theo!
+                        </p>
+
+                        <div class="negotiate-presets-section">
+                            <div class="section-subtitle">CHỌN KỊCH BẢN ĐÀM PHÁN MẪU:</div>
+                            <div class="preset-negotiations-grid" id="preset-negotiations-grid"></div>
+                        </div>
+
+                        <div class="custom-negotiation-box">
+                            <div class="form-field">
+                                <label for="custom-neg-title">Chủ đề đàm phán:</label>
+                                <input type="text" id="custom-neg-title" placeholder="Ví dụ: Đàm phán bồi thường sự cố hàng hóa giao chậm 15 ngày">
+                            </div>
+                            <div class="two-cols-field">
+                                <div class="form-field">
+                                    <label for="custom-neg-user-role">Vai trò của bạn:</label>
+                                    <input type="text" id="custom-neg-user-role" placeholder="Ví dụ: Giám đốc bên Mua hàng">
+                                </div>
+                                <div class="form-field">
+                                    <label for="custom-neg-opp-role">Đối phương cần thương lượng:</label>
+                                    <input type="text" id="custom-neg-opp-role" placeholder="Ví dụ: Giám đốc bên Vận chuyển">
+                                </div>
+                            </div>
+                            <div class="form-field">
+                                <label for="custom-neg-context">Bối cảnh & Mục tiêu đàm phán của bạn:</label>
+                                <textarea id="custom-neg-context" class="negotiate-context-textarea" placeholder="Nêu rõ số tiền tranh chấp, điều khoản vi phạm, điều bạn muốn đạt được (ví dụ: đòi bồi thường 50 triệu và tiếp tục hợp đồng)..."></textarea>
+                            </div>
+                        </div>
+
+                        <button class="btn-enter-court" id="btn-start-negotiate">
+                            <span class="icon">🤝</span>
+                            <span>BẮT ĐẦU BUỔI THƯƠNG LƯỢNG ĐÀM PHÁN</span>
+                        </button>
+                    </div>
+
+                    <div class="negotiate-arena" id="negotiate-arena" style="display: none;">
+                        <div class="arena-header">
+                            <div class="arena-case-info">
+                                <span class="arena-gavel-icon">🤝</span>
+                                <div>
+                                    <div class="arena-case-title" id="neg-arena-title">Đàm Phán Thu Hồi Nợ Khó Đòi</div>
+                                    <div class="arena-user-role" id="neg-arena-roles">Bạn: Chủ nợ vs Đối tác nợ 200tr</div>
+                                </div>
+                            </div>
+
+                            <div class="persuasion-meter-wrap">
+                                <div class="meter-labels">
+                                    <span>LÀM CHỦ THẾ TRẬN ĐÀM PHÁN:</span>
+                                    <strong id="neg-meter-score-text">50%</strong>
+                                </div>
+                                <div class="meter-bar-track">
+                                    <div class="meter-bar-fill neg-fill" id="neg-meter-bar-fill" style="width: 50%;"></div>
+                                </div>
+                            </div>
+
+                            <button class="btn-secondary" id="btn-exit-negotiate" title="Kết thúc đàm phán">
+                                <span>Thoát / Đổi Kịch Bản</span>
+                            </button>
+                        </div>
+
+                        <div class="arena-transcript" id="neg-transcript"></div>
+
+                        <div class="arena-composer">
+                            <div class="negotiate-tip-box" id="neg-tip-box" style="display: none;">
+                                <div class="tip-header">💡 GỢI Ý CHIÊU BÀI PHÁP LÝ TIẾP THEO (BẤM ĐỂ CHỌN NHANH):</div>
+                                <div class="tip-quote" id="neg-recommended-chip"></div>
+                            </div>
+
+                            <div class="arena-composer-box">
+                                <button class="btn-voice" id="btn-neg-voice" title="Nói tiếng Việt để nhập liệu">🎙️</button>
+                                <textarea 
+                                    id="neg-user-input" 
+                                    class="arena-textarea" 
+                                    placeholder="Nói hoặc gõ lời phát biểu thương lượng của bạn... (Enter để gửi)" 
+                                    rows="1"
+                                ></textarea>
+                                <button class="btn-court-send" id="btn-neg-send" title="Gửi lời đàm phán">
+                                    <span class="icon">💬</span>
+                                    <span>Phát Biểu</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 5: SOẠN THẢO ĐƠN TỪ TỐ TỤNG & HÀNH CHÍNH -->
+            <div class="view-panel" id="view-petition">
+                <div class="petition-container">
+                    <div class="petition-header">
+                        <div class="review-badge">LEGAL PETITION GENERATOR</div>
+                        <h2 class="review-title">Soạn Thảo Đơn Tố Tụng & Hành Chính Tự Động</h2>
+                        <p class="review-desc">
+                            Soạn Đơn khởi kiện chuẩn Mẫu số 23-DS (NQ 01/2017/NQ-HĐTP), Đơn tố giác tội phạm, Đơn thuận tình ly hôn, 
+                            hoặc Thông báo đòi nợ đanh thép, viện dẫn chính xác căn cứ pháp luật và sẵn sàng tải về file Word (.docx) để in ký nộp cơ quan có thẩm quyền.
+                        </p>
+                    </div>
+
+                    <div class="petition-form-card" id="petition-form-card">
+                        <div class="form-field">
+                            <label for="petition-type-select">Loại đơn từ tố tụng / thông báo cần soạn thảo:</label>
+                            <select id="petition-type-select">
+                                <option value="civil_lawsuit" selected>⚖️ Đơn Khởi Kiện Dân Sự / Kinh Tế (Mẫu số 23-DS - NQ 01/2017/NQ-HĐTP)</option>
+                                <option value="criminal_report">🚔 Đơn Tố Giác / Tố Cáo Tội Phạm (Lừa đảo, Lạm dụng tín nhiệm - BLHS 2015)</option>
+                                <option value="mutual_divorce">💔 Đơn Yêu Cầu Công Nhận Thuận Tình Ly Hôn & Thỏa Thuận Con Cái, Tài Sản</option>
+                                <option value="debt_notice">📜 Thông Báo Đòi Nợ & Cảnh Báo Khởi Kiện (Tạo áp lực thi hành nghĩa vụ)</option>
+                                <option value="admin_complaint">🏛️ Đơn Khiếu Nại Quyết Định Hành Chính (Đất đai, Thu hồi đất, Xử phạt)</option>
+                            </select>
+                        </div>
+
+                        <div class="petition-parties-grid">
+                            <div class="party-box">
+                                <div class="party-box-title">👤 THÔNG TIN BÊN LÀM ĐƠN / NGUYÊN ĐƠN</div>
+                                <div class="form-field">
+                                    <label>Họ và tên:</label>
+                                    <input type="text" id="pet-plaintiff-name" placeholder="Nguyễn Văn A">
+                                </div>
+                                <div class="two-cols-field">
+                                    <div class="form-field">
+                                        <label>Số CCCD / Căn cước:</label>
+                                        <input type="text" id="pet-plaintiff-id" placeholder="00109900xxxx">
+                                    </div>
+                                    <div class="form-field">
+                                        <label>Số điện thoại:</label>
+                                        <input type="text" id="pet-plaintiff-phone" placeholder="0901234xxx">
+                                    </div>
+                                </div>
+                                <div class="form-field">
+                                    <label>Địa chỉ cư trú hiện nay:</label>
+                                    <input type="text" id="pet-plaintiff-address" placeholder="Số 123 Đường XYZ, Phường..., Quận/Huyện..., TP...">
+                                </div>
+                            </div>
+
+                            <div class="party-box">
+                                <div class="party-box-title">👥 THÔNG TIN BÊN BỊ ĐƠN / BỊ TỐ CÁO</div>
+                                <div class="form-field">
+                                    <label>Họ tên cá nhân / Tên công ty:</label>
+                                    <input type="text" id="pet-defendant-name" placeholder="Trần Thị B hoặc Công ty TNHH...">
+                                </div>
+                                <div class="form-field">
+                                    <label>Số điện thoại (nếu biết):</label>
+                                    <input type="text" id="pet-defendant-phone" placeholder="0987654xxx">
+                                </div>
+                                <div class="form-field">
+                                    <label>Địa chỉ / Trụ sở:</label>
+                                    <input type="text" id="pet-defendant-address" placeholder="Nơi cư trú hoặc trụ sở bên bị kiện...">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-field">
+                            <label for="pet-facts">Tóm tắt sự việc theo trình tự thời gian:</label>
+                            <textarea id="pet-facts" class="petition-textarea" placeholder="Ví dụ: Ngày 15/03/2024, tôi và bên B có ký Hợp đồng vay tiền số 01/2024 số tiền 300 triệu đồng, thời hạn 6 tháng. Đến hạn ngày 15/09/2024, bên B cố tình trốn tránh không thanh toán mặc dù tôi đã nhiều lần nhắc nợ..."></textarea>
+                        </div>
+
+                        <div class="form-field">
+                            <label for="pet-claims">Yêu cầu cụ thể đề nghị Tòa án / Cơ quan giải quyết:</label>
+                            <textarea id="pet-claims" class="petition-claims-textarea" placeholder="Ví dụ: 1. Buộc ông Trần Thị B phải thanh toán nợ gốc 300.000.000 VNĐ; 2. Buộc thanh toán tiền lãi chậm trả theo Điều 468 BLDS..."></textarea>
+                        </div>
+
+                        <div class="form-field">
+                            <label for="pet-evidence">Danh mục tài liệu chứng cứ kèm theo đơn (tùy chọn):</label>
+                            <input type="text" id="pet-evidence" placeholder="Ví dụ: Bản sao CCCD, Hợp đồng vay tiền, Sao kê ủy nhiệm chi ngân hàng Vietcombank, Vi bằng tin nhắn Zalo...">
+                        </div>
+
+                        <button class="btn-start-review" id="btn-generate-petition">
+                            <span class="icon">🚀</span>
+                            <span>TIẾN HÀNH SOẠN THẢO VĂN BẢN CHUẨN MẪU</span>
+                        </button>
+                    </div>
+
+                    <div class="petition-loading" id="petition-loading" style="display: none;">
+                        <div class="spinner"></div>
+                        <div class="loading-title">AI Luật Sư Đang Soạn Thảo Văn Bản Tố Tụng...</div>
+                        <div class="loading-desc">Đang đối chiếu Nghị quyết 01/2017/NQ-HĐTP, chuẩn hóa thể thức Nghị định 30/2020 và viện dẫn điều luật đanh thép.</div>
+                    </div>
+
+                    <div class="petition-result-card" id="petition-result-card" style="display: none;">
+                        <div class="result-header">
+                            <div class="result-title-wrap">
+                                <span class="doc-icon">📜</span>
+                                <div>
+                                    <h3 class="result-doc-name" id="pet-result-title">Đơn Khởi Kiện Dân Sự Chuẩn Thể Thức</h3>
+                                    <span class="result-model-badge">⚖️ Sẵn sàng in ký hoặc nộp trực tuyến</span>
+                                </div>
+                            </div>
+                            <div class="result-actions">
+                                <button class="btn-action btn-export-docx" id="btn-export-petition-docx">📥 Tải File Word (.docx)</button>
+                                <button class="btn-action" id="btn-copy-petition">📋 Sao chép</button>
+                                <button class="btn-action" id="btn-edit-petition">✏️ Chỉnh sửa lại thông tin</button>
+                            </div>
+                        </div>
+                        <div class="result-body markdown-content petition-preview" id="pet-result-content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 6: THẨM TRA SỨC NẶNG CHỨNG CỨ & KHÁM SỨC KHỎE PHÁP CHẾ -->
+            <div class="view-panel" id="view-auditor">
+                <div class="auditor-container">
+                    <div class="auditor-subnav">
+                        <button class="auditor-tab-btn active" id="tab-evidence-audit">
+                            <span>🔍 Thẩm Tra Sức Nặng Chứng Cứ (A+ → F)</span>
+                        </button>
+                        <button class="auditor-tab-btn" id="tab-corporate-audit">
+                            <span>🏢 Khám Sức Khỏe Pháp Chế Doanh Nghiệp (8 Trụ Cột)</span>
+                        </button>
+                    </div>
+
+                    <!-- Panel A: Evidence Audit -->
+                    <div class="auditor-subpanel active" id="subpanel-evidence">
+                        <div class="review-header">
+                            <div class="review-badge">EVIDENCE PROBATIVE STRENGTH AUDITOR</div>
+                            <h2 class="review-title">Bộ Thẩm Tra & Chấm Điểm Sức Nặng Chứng Cứ</h2>
+                            <p class="review-desc">
+                                Đánh giá chứng cứ theo 3 thuộc tính luật định (Khách quan, Hợp pháp, Liên quan) theo Điều 86-97 BLTTDS. 
+                                Phân hạng A+ đến F, phát hiện sơ hở dễ bị bác bỏ và chỉ rõ giải pháp củng cố (Lập Vi bằng Thừa phát lại, đề nghị Tòa thu thập...).
+                            </p>
+                        </div>
+
+                        <div class="review-input-card">
+                            <div class="form-field">
+                                <label for="ev-case-summary">Tóm tắt yêu cầu tranh chấp / Vụ án của bạn:</label>
+                                <textarea id="ev-case-summary" class="court-facts-textarea" placeholder="Ví dụ: Tôi khởi kiện đòi đối tác trả nợ 500 triệu đồng giao dịch mua bán hàng hóa nông sản..."></textarea>
+                            </div>
+
+                            <div class="form-field">
+                                <label>Danh sách tài liệu, chứng cứ bạn đang nắm giữ (Nhập từng dòng):</label>
+                                <div class="evidence-input-rows" id="evidence-input-rows">
+                                    <input type="text" class="evidence-row-input" placeholder="Chứng cứ 1: Ảnh chụp tin nhắn Zalo thỏa thuận trả nợ ngày 10/05...">
+                                    <input type="text" class="evidence-row-input" placeholder="Chứng cứ 2: Biên nhận tiền viết tay có chữ ký của bên vay...">
+                                    <input type="text" class="evidence-row-input" placeholder="Chứng cứ 3: Sao kê tài khoản ngân hàng chuyển khoản 500 triệu...">
+                                </div>
+                                <button type="button" class="btn-add-evidence-row" id="btn-add-evidence-row">+ Thêm tài liệu chứng cứ khác</button>
+                            </div>
+
+                            <button class="btn-start-review" id="btn-start-evidence-audit">
+                                <span class="icon">🛡️</span>
+                                <span>THẨM TRA TÍNH PHÁP LÝ & SỨC NẶNG CHỨNG CỨ</span>
+                            </button>
+                        </div>
+
+                        <div class="review-loading" id="evidence-loading" style="display: none;">
+                            <div class="spinner"></div>
+                            <div class="loading-title">Đang Thẩm Định Tính Hợp Pháp Của Chứng Cứ...</div>
+                            <div class="loading-desc">Đối chiếu quy định Điều 86-97 Bộ luật Tố tụng Dân sự và kỹ thuật lập vi bằng Thừa phát lại.</div>
+                        </div>
+
+                        <div class="evidence-result-card" id="evidence-result-card" style="display: none;">
+                            <div class="result-header">
+                                <div class="result-title-wrap">
+                                    <span class="doc-icon">🛡️</span>
+                                    <div>
+                                        <h3 class="result-doc-name">Bảng Đánh Giá Sức Nặng Chứng Cứ Tố Tụng</h3>
+                                        <span class="result-model-badge" id="ev-overall-badge">Độ vững chắc: Vững chắc</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="evidence-table-wrap">
+                                <table class="evidence-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Tài liệu / Chứng cứ</th>
+                                            <th style="width: 90px; text-align: center;">Xếp hạng</th>
+                                            <th>Giá trị chứng minh</th>
+                                            <th>Lỗ hổng / Rủi ro bị bác</th>
+                                            <th>Biện pháp khắc phục (Vi bằng / Tòa án)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="evidence-table-body"></tbody>
+                                </table>
+                            </div>
+                            <div class="evidence-general-box">
+                                <div class="box-title">🎯 CHIẾN THUẬT CỦNG CỐ HỒ SƠ TỔNG THỂ:</div>
+                                <div id="ev-general-recommendations" class="markdown-content"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Panel B: Corporate Compliance Audit -->
+                    <div class="auditor-subpanel" id="subpanel-corporate" style="display: none;">
+                        <div class="review-header">
+                            <div class="review-badge">CORPORATE COMPLIANCE HEALTH CHECK 2026</div>
+                            <h2 class="review-title">Khám Sức Khỏe Pháp Chế Doanh Nghiệp (8 Trụ Cột)</h2>
+                            <p class="review-desc">
+                                Rà soát rủi ro pháp lý toàn diện từ Lao động, Hợp đồng, Thuế, PCCC, Dữ liệu cá nhân (NĐ 13/2023) đến TMĐT và Sở hữu trí tuệ. Xuất báo cáo Word (.docx) chuyên nghiệp.
+                            </p>
+                        </div>
+
+                        <div class="review-input-card">
+                            <div class="two-cols-field">
+                                <div class="form-field">
+                                    <label for="corp-name">Tên Doanh Nghiệp:</label>
+                                    <input type="text" id="corp-name" placeholder="Ví dụ: Công ty Cổ phần Công nghệ ABC">
+                                </div>
+                                <div class="form-field">
+                                    <label for="corp-type">Loại hình doanh nghiệp:</label>
+                                    <select id="corp-type">
+                                        <option value="Công ty TNHH 1 Thành viên" selected>Công ty TNHH 1 Thành viên</option>
+                                        <option value="Công ty TNHH 2 Thành viên trở lên">Công ty TNHH 2 TV trở lên</option>
+                                        <option value="Công ty Cổ phần">Công ty Cổ phần</option>
+                                        <option value="Hộ kinh doanh cá thể">Hộ kinh doanh cá thể</option>
+                                        <option value="Doanh nghiệp tư nhân">Doanh nghiệp tư nhân</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="two-cols-field">
+                                <div class="form-field">
+                                    <label for="corp-emp-count">Quy mô nhân sự (người):</label>
+                                    <input type="number" id="corp-emp-count" value="25" min="1">
+                                </div>
+                                <div class="form-field">
+                                    <label for="corp-industry">Ngành nghề kinh doanh chính:</label>
+                                    <input type="text" id="corp-industry" placeholder="Ví dụ: Thương mại điện tử, F&B, Xây dựng, Dịch vụ phần mềm...">
+                                </div>
+                            </div>
+                            <div class="form-field">
+                                <label for="corp-notes">Thực trạng hoặc vấn đề đang băn khoăn (tùy chọn):</label>
+                                <textarea id="corp-notes" class="court-facts-textarea" placeholder="Ví dụ: Chưa đăng ký nội quy lao động với Sở LĐTBXH, có website bán hàng chưa thông báo Bộ Công Thương, chưa làm hồ sơ bảo vệ dữ liệu cá nhân theo NĐ 13..."></textarea>
+                            </div>
+
+                            <button class="btn-start-review" id="btn-start-corp-audit">
+                                <span class="icon">🏢</span>
+                                <span>TIẾN HÀNH KHÁM SỨC KHỎE PHÁP CHẾ DOANH NGHIỆP</span>
+                            </button>
+                        </div>
+
+                        <div class="review-loading" id="corp-loading" style="display: none;">
+                            <div class="spinner"></div>
+                            <div class="loading-title">Đang Rà Soát 8 Trụ Cột Pháp Chế Doanh Nghiệp...</div>
+                            <div class="loading-desc">Thẩm định theo khung pháp lý Việt Nam 2026: Doanh nghiệp, Lao động, BHXH, Thuế, PCCC, Bảo vệ dữ liệu cá nhân.</div>
+                        </div>
+
+                        <div class="corp-result-card" id="corp-result-card" style="display: none;">
+                            <div class="result-header">
+                                <div class="result-title-wrap">
+                                    <span class="doc-icon">🏢</span>
+                                    <div>
+                                        <h3 class="result-doc-name" id="corp-result-company">Báo Cáo Sức Khỏe Pháp Chế Doanh Nghiệp</h3>
+                                        <span class="result-model-badge" id="corp-score-badge">Điểm tuân thủ: 80/100</span>
+                                    </div>
+                                </div>
+                                <div class="result-actions">
+                                    <button class="btn-action btn-export-docx" id="btn-export-corp-docx">📥 Tải Báo Cáo Word (.docx)</button>
+                                </div>
+                            </div>
+                            <div class="corp-summary-box" id="corp-summary-text"></div>
+                            <div class="corp-pillars-grid" id="corp-pillars-grid"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </main>
+    </div>
+
+    <!-- MODAL 3: BỘ TIỆN ÍCH TÍNH TOÁN PHÁP LÝ TỰ ĐỘNG -->
+    <div class="modal-backdrop" id="calc-modal">
+        <div class="modal-card calc-modal-card">
+            <div class="modal-header">
+                <div class="calc-modal-title-wrap">
+                    <span class="calc-emblem">🧮</span>
+                    <div>
+                        <h3 class="modal-title">Bộ Tiện Ích Tính Toán Pháp Lý & Tố Tụng 2026</h3>
+                        <span class="modal-sub">Án phí TANDTC, Lãi chậm trả Điều 468 BLDS, Thuế BĐS & Trợ cấp thôi việc</span>
+                    </div>
+                </div>
+                <button class="btn-close-modal" id="btn-close-calc">&times;</button>
+            </div>
+            <div class="modal-body calc-modal-body">
+                <div class="calc-tabs">
+                    <button class="calc-tab-btn active" data-tab="court-fee">⚖️ Án Phí Tòa Án</button>
+                    <button class="calc-tab-btn" data-tab="late-interest">📈 Lãi Suất Chậm Trả</button>
+                    <button class="calc-tab-btn" data-tab="property-tax">🏡 Thuế Chuyển Nhượng BĐS</button>
+                    <button class="calc-tab-btn" data-tab="severance">💼 Trợ Cấp Thôi Việc</button>
+                </div>
+
+                <!-- Tab 1: Court Fee -->
+                <div class="calc-tab-content active" id="tab-court-fee">
+                    <div class="calc-form-grid">
+                        <div class="form-field">
+                            <label>Loại vụ án tranh chấp:</label>
+                            <select id="calc-fee-dispute-type">
+                                <option value="civil" selected>Tranh chấp Dân sự, Hôn nhân gia đình, Đất đai</option>
+                                <option value="commercial">Tranh chấp Kinh doanh Thương mại</option>
+                                <option value="non_monetary">Vụ án không có giá ngạch (Ly hôn không chia tài sản, hủy hợp đồng...)</option>
+                            </select>
+                        </div>
+                        <div class="form-field" id="calc-fee-amount-group">
+                            <label>Giá trị tranh chấp (VNĐ):</label>
+                            <input type="number" id="calc-fee-amount" placeholder="Ví dụ: 200000000 (200 triệu)" value="200000000">
+                        </div>
+                    </div>
+                    <button class="btn-calc-action" id="btn-do-calc-fee">Tính Ngay</button>
+                </div>
+
+                <!-- Tab 2: Late Interest -->
+                <div class="calc-tab-content" id="tab-late-interest" style="display:none;">
+                    <div class="calc-form-grid">
+                        <div class="form-field">
+                            <label>Số tiền nợ gốc chậm trả (VNĐ):</label>
+                            <input type="number" id="calc-int-principal" placeholder="Ví dụ: 100000000" value="100000000">
+                        </div>
+                        <div class="form-field">
+                            <label>Lãi suất (%/năm, mặc định 10% theo luật, tối đa 20%):</label>
+                            <input type="number" id="calc-int-rate" value="10" step="0.5" max="20" min="1">
+                        </div>
+                        <div class="two-cols-field">
+                            <div class="form-field">
+                                <label>Ngày bắt đầu tính lãi:</label>
+                                <input type="date" id="calc-int-start">
+                            </div>
+                            <div class="form-field">
+                                <label>Ngày thanh toán / chốt nợ:</label>
+                                <input type="date" id="calc-int-end">
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn-calc-action" id="btn-do-calc-int">Tính Ngay</button>
+                </div>
+
+                <!-- Tab 3: Property Tax -->
+                <div class="calc-tab-content" id="tab-property-tax" style="display:none;">
+                    <div class="calc-form-grid">
+                        <div class="form-field">
+                            <label>Giá trị chuyển nhượng trên hợp đồng (VNĐ):</label>
+                            <input type="number" id="calc-tax-price" placeholder="Ví dụ: 3000000000 (3 tỷ)" value="3000000000">
+                        </div>
+                        <div class="form-field">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="calc-tax-first-home">
+                                <span>Người bán chỉ có duy nhất 01 bất động sản (Được miễn thuế TNCN 2%)</span>
+                            </label>
+                        </div>
+                    </div>
+                    <button class="btn-calc-action" id="btn-do-calc-tax">Tính Ngay</button>
+                </div>
+
+                <!-- Tab 4: Severance Allowance -->
+                <div class="calc-tab-content" id="tab-severance" style="display:none;">
+                    <div class="calc-form-grid">
+                        <div class="form-field">
+                            <label>Tiền lương bình quân 06 tháng liền kề (VNĐ):</label>
+                            <input type="number" id="calc-sev-salary" placeholder="Ví dụ: 15000000" value="15000000">
+                        </div>
+                        <div class="form-field">
+                            <label>Số năm làm việc thực tế tính trợ cấp (năm):</label>
+                            <input type="number" id="calc-sev-years" placeholder="Ví dụ: 3.5" value="3" step="0.5" min="0.5">
+                            <small class="form-hint">Thời gian làm việc không đóng Bảo hiểm thất nghiệp (trước 2009 hoặc thời gian thử việc...)</small>
+                        </div>
+                    </div>
+                    <button class="btn-calc-action" id="btn-do-calc-sev">Tính Ngay</button>
+                </div>
+
+                <!-- Calculation Result Display -->
+                <div class="calc-result-box" id="calc-result-box" style="display:none;">
+                    <div class="calc-result-title" id="calc-result-title">Kết Quả Tính Toán</div>
+                    <div class="calc-result-summary" id="calc-result-summary"></div>
+                    <div class="calc-result-details" id="calc-result-details"></div>
+                    <div class="calc-result-legal" id="calc-result-legal"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- MODAL 1: XEM NGUYÊN VĂN ĐIỀU LUẬT GỐC (RAG LAW INSPECTOR) -->
