@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Luật Sư — Cố Vấn Pháp Lý, Rà Soát Hợp Đồng & Đấu Trường Tranh Tụng</title>
+    <meta name="description" content="Nền tảng Cố vấn Pháp lý Trí tuệ Nhân tạo tích hợp RAG tra cứu trực tiếp kho luật Việt Nam chính thống từ vbpl.vn.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <!-- Marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="brand">
+                    <div class="brand-icon">⚖️</div>
+                    <div class="brand-text">
+                        <span class="brand-title">AI HUỲNH NGUYÊN KHANG</span>
+                        <span class="brand-badge">CHUYÊN TRỊ RỦI RO PHÁP LÝ</span>
+                    </div>
+                </div>
+
+                <!-- 3 Chế độ hoạt động chính -->
+                <div class="nav-modes">
+                    <button class="nav-mode-btn active" id="mode-chat" data-mode="chat">
+                        <span class="icon">💬</span>
+                        <span>Tư Vấn Pháp Lý</span>
+                    </button>
+                    <button class="nav-mode-btn" id="mode-review" data-mode="review">
+                        <span class="icon">📑</span>
+                        <span>Rà Soát Hợp Đồng</span>
+                        <span class="badge-pro">PRO</span>
+                    </button>
+                    <button class="nav-mode-btn" id="mode-court" data-mode="court">
+                        <span class="icon">🔨</span>
+                        <span>Phiên Tòa Giả Lập</span>
+                        <span class="badge-live">LIVE</span>
+                    </button>
+                </div>
+
+                <button class="btn-new-chat" id="btn-new-chat" title="Bắt đầu phiên làm việc mới">
+                    <span class="icon">+</span>
+                    <span id="btn-new-chat-text">Phiên tư vấn mới</span>
+                </button>
+            </div>
+
+            <!-- Categories Section (Hiển thị khi ở chế độ Chat) -->
+            <div class="sidebar-section" id="sidebar-categories-section">
+                <div class="section-label">LĨNH VỰC PHÁP LÝ</div>
+                <div class="category-list" id="category-list"></div>
+            </div>
+
+            <!-- Quick Law Search Box in Sidebar -->
+            <div class="sidebar-section law-search-section">
+                <div class="section-label">TRA CỨU LUẬT CHÍNH THỐNG (VBPL.VN)</div>
+                <div class="sidebar-search-box">
+                    <input type="text" id="sidebar-law-search" placeholder="Nhập từ khóa hoặc số điều (ví dụ: Điều 328)...">
+                    <button type="button" id="btn-sidebar-law-search">🔍</button>
+                </div>
+            </div>
+
+            <!-- History Section -->
+            <div class="sidebar-section history-section">
+                <div class="section-label">LỊCH SỬ PHIÊN LÀM VIỆC</div>
+                <div class="history-list" id="history-list">
+                    <div class="history-empty">Chưa có phiên làm việc nào</div>
+                </div>
+            </div>
+
+            <!-- Sidebar Footer -->
+            <div class="sidebar-footer">
+                <div class="creator-badge" title="Tác giả & Người sáng lập hệ thống">
+                    <span class="creator-crown">👑</span>
+                    <span class="creator-label">Người tạo:</span>
+                    <span class="creator-name">Bố Bảo</span>
+                </div>
+                <button class="btn-settings" id="btn-open-settings">
+                    <span class="icon">⚙️</span>
+                    <span class="text">Cài đặt Kết nối</span>
+                    <span class="status-dot" id="api-status-dot" title="Đang kiểm tra kết nối..."></span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Top Header Bar -->
+            <header class="top-bar">
+                <div class="top-left">
+                    <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" title="Ẩn/Hiện Sidebar">☰</button>
+                    <div class="current-category" id="current-category-display">
+                        <span class="cat-icon">⚖️</span>
+                        <h1 class="cat-title">Tư vấn Tổng hợp</h1>
+                    </div>
+                </div>
+                <div class="top-slogan-pill">
+                    <span>🛡️</span>
+                    <span>AI Huỳnh Nguyên Khang — Chuyên Trị Mọi Rủi Ro | Người tạo: Bố Bảo</span>
+                </div>
+                <div class="top-right">
+                    <div class="rag-status-badge" title="Động cơ RAG đối chiếu trực tiếp với kho dữ liệu vbpl.vn">
+                        <span class="rag-icon">📚</span>
+                        <span>RAG: vbpl.vn Active</span>
+                    </div>
+                    <div class="system-online-badge" title="Hệ thống AI Luật Sư sẵn sàng hoạt động">
+                        <span class="pulse-dot"></span>
+                        <span>Hệ Thống Trực Tuyến</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- VIEW 1: CHAT TƯ VẤN PHÁP LÝ (TÍCH HỢP RAG) -->
+            <div class="view-panel active" id="view-chat">
+                <div class="chat-container" id="chat-container">
+                    <div class="welcome-screen" id="welcome-screen">
+                        <div class="welcome-emblem">⚖️</div>
+                        <div class="brand-hero-slogan">
+                            <span class="sparkle">⚡</span>
+                            <span class="slogan-main">AI HUỲNH NGUYÊN KHANG</span>
+                            <span class="slogan-sep">—</span>
+                            <span class="slogan-sub">CHUYÊN TRỊ MỌI RỦI RO PHÁP LÝ & HỢP ĐỒNG</span>
+                        </div>
+                        <div class="hero-creator-tag">
+                            <span class="crown-icon">👑</span>
+                            <span>Bản quyền & Người sáng lập: <strong>Bố Bảo</strong></span>
+                        </div>
+                        <h2 class="welcome-title">Cố Vấn Pháp Lý Trí Tuệ Nhân Tạo</h2>
+                        <p class="welcome-subtitle">
+                            Được huấn luyện theo tư duy chuẩn mực của Luật sư Việt Nam. <strong>Tích hợp động cơ RAG</strong> đối chiếu trực tiếp với Bộ luật Dân sự 2015, Bộ luật Lao động 2019, Luật Đất đai 2024 mới nhất.
+                        </p>
+
+                        <div class="framework-card">
+                            <div class="framework-step">
+                                <span class="num">1</span>
+                                <span class="txt">Nhận diện quan hệ pháp lý</span>
+                            </div>
+                            <div class="framework-arrow">➔</div>
+                            <div class="framework-step">
+                                <span class="num">2</span>
+                                <span class="txt">RAG đối chiếu điều luật gốc</span>
+                            </div>
+                            <div class="framework-arrow">➔</div>
+                            <div class="framework-step">
+                                <span class="num">3</span>
+                                <span class="txt">Phân tích rủi ro & quyền lợi</span>
+                            </div>
+                            <div class="framework-arrow">➔</div>
+                            <div class="framework-step">
+                                <span class="num">4</span>
+                                <span class="txt">Khuyến nghị lộ trình thực tế</span>
+                            </div>
+                        </div>
+
+                        <div class="quick-prompts-container">
+                            <div class="quick-prompts-label">CÂU HỎI THƯỜNG GẶP (BẤM ĐỂ HỎI NHANH):</div>
+                            <div class="quick-prompts-grid" id="quick-prompts-grid"></div>
+                        </div>
+                    </div>
+
+                    <div class="messages-list" id="messages-list"></div>
+                </div>
+
+                <div class="composer-container">
+                    <div class="disclaimer-bar">
+                        <span class="shield-icon">🛡️</span>
+                        <span>Mọi trích dẫn điều luật được đối chiếu từ CSDL Quốc gia về Văn bản Pháp luật (vbpl.vn). Thông tin mang tính định hướng tham khảo.</span>
+                    </div>
+                    <div class="composer-box">
+                        <button class="btn-attach" id="btn-chat-attach" title="Gửi nhanh file hợp đồng để rà soát">📎</button>
+                        <input type="file" id="chat-file-input" style="display:none;" accept=".pdf,.docx,.txt,.png,.jpg,.jpeg">
+                        <textarea 
+                            id="user-input" 
+                            class="composer-textarea" 
+                            placeholder="Mô tả sự việc, tình huống pháp lý hoặc câu hỏi của bạn... (Enter để gửi, Shift + Enter để xuống dòng)" 
+                            rows="1"
+                        ></textarea>
+                        <button class="btn-send" id="btn-send" title="Gửi câu hỏi" disabled>
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 2: RÀ SOÁT & THẨM ĐỊNH HỢP ĐỒNG -->
+            <div class="view-panel" id="view-review">
+                <div class="contract-review-container">
+                    <div class="review-header">
+                        <div class="review-badge">CONTRACT RISK AUDITOR</div>
+                        <h2 class="review-title">Thẩm Định & Bóc Tách Rủi Ro Hợp Đồng</h2>
+                        <p class="review-desc">
+                            Tải lên dự thảo hợp đồng để AI phân tích chỉ số rủi ro, phát hiện điều khoản "gài bẫy", điều khoản trái luật và đề xuất sửa đổi an toàn.
+                        </p>
+                    </div>
+
+                    <div class="review-input-card">
+                        <div class="dropzone" id="contract-dropzone">
+                            <input type="file" id="contract-file-input" class="file-input-hidden" accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.webp">
+                            <div class="dropzone-content" id="dropzone-default">
+                                <div class="dropzone-icon">📄</div>
+                                <div class="dropzone-text">
+                                    <strong>Kéo thả file hợp đồng vào đây</strong> hoặc <span class="browse-link">chọn file từ máy tính</span>
+                                </div>
+                                <div class="dropzone-hint">Hỗ trợ file PDF, DOCX (Word), TXT, hoặc Hình ảnh scan hợp đồng (Tối đa 25MB)</div>
+                            </div>
+                            <div class="dropzone-file-selected" id="dropzone-selected" style="display: none;">
+                                <div class="selected-file-icon">📑</div>
+                                <div class="selected-file-info">
+                                    <div class="selected-file-name" id="selected-file-name">hop_dong.pdf</div>
+                                    <div class="selected-file-size" id="selected-file-size">1.2 MB</div>
+                                </div>
+                                <button type="button" class="btn-remove-file" id="btn-remove-file" title="Hủy chọn file">&times;</button>
+                            </div>
+                        </div>
+
+                        <div class="review-options-grid">
+                            <div class="form-field">
+                                <label for="party-role">Vị thế của bạn trong hợp đồng:</label>
+                                <select id="party-role">
+                                    <option value="Bên thuê (Thuê nhà / Thuê mặt bằng kinh doanh)" selected>Bên thuê (Thuê nhà / Mặt bằng kinh doanh)</option>
+                                    <option value="Bên cho thuê (Chủ nhà / Chủ mặt bằng)">Bên cho thuê (Chủ nhà / Mặt bằng)</option>
+                                    <option value="Bên mua (Mua đất, căn hộ, hàng hóa, tài sản)">Bên mua (Mua đất, căn hộ, hàng hóa)</option>
+                                    <option value="Bên bán (Bán đất, hàng hóa, tài sản)">Bên bán (Bán đất, hàng hóa, tài sản)</option>
+                                    <option value="Người lao động (Ký hợp đồng lao động)">Người lao động (Hợp đồng lao động)</option>
+                                    <option value="Người sử dụng lao động (Doanh nghiệp tuyển dụng)">Người sử dụng lao động (Doanh nghiệp)</option>
+                                    <option value="Bên cung cấp dịch vụ (Nhận thầu, gia công)">Bên cung cấp dịch vụ (Gia công, thầu)</option>
+                                    <option value="Bên sử dụng dịch vụ (Khách hàng thuê dịch vụ)">Bên sử dụng dịch vụ (Thuê dịch vụ)</option>
+                                </select>
+                            </div>
+                            <div class="form-field">
+                                <label for="focus-areas">Trọng tâm cần rà soát đặc biệt (Tùy chọn):</label>
+                                <input type="text" id="focus-areas" placeholder="Ví dụ: Rà soát điều khoản phạt cọc, tăng giá và chấm dứt đơn phương...">
+                            </div>
+                        </div>
+
+                        <div class="manual-text-toggle">
+                            <button type="button" class="btn-toggle-text" id="btn-toggle-text">Hoặc dán trực tiếp điều khoản hợp đồng dạng văn bản ▼</button>
+                            <textarea id="contract-manual-text" class="contract-textarea" placeholder="Dán nội dung hợp đồng hoặc các điều khoản bạn muốn kiểm tra vào đây..." style="display: none;"></textarea>
+                        </div>
+
+                        <button class="btn-start-review" id="btn-start-review">
+                            <span class="icon">🚀</span>
+                            <span>BẮT ĐẦU THẨM ĐỊNH HỢP ĐỒNG</span>
+                        </button>
+                    </div>
+
+                    <div class="review-loading" id="review-loading" style="display: none;">
+                        <div class="spinner"></div>
+                        <div class="loading-title">AI Luật Sư Đang Thẩm Định Hợp Đồng...</div>
+                        <div class="loading-desc">Đang bóc tách điều khoản, đối chiếu quy định pháp luật và lập bảng cảnh báo rủi ro.</div>
+                    </div>
+
+                    <div class="review-result-card" id="review-result-card" style="display: none;">
+                        <div class="result-header">
+                            <div class="result-title-wrap">
+                                <span class="doc-icon">📑</span>
+                                <div>
+                                    <h3 class="result-doc-name" id="result-doc-name">Kết Quả Thẩm Định Hợp Đồng</h3>
+                                    <span class="result-model-badge" id="result-model-badge">⚖️ Thẩm định hoàn tất</span>
+                                </div>
+                            </div>
+                            <div class="result-actions">
+                                <button class="btn-action" id="btn-copy-result" title="Sao chép toàn bộ kết quả">📋 Sao chép</button>
+                                <button class="btn-action" id="btn-print-result" title="In hoặc lưu PDF">🖨️ In kết quả</button>
+                            </div>
+                        </div>
+                        <div class="result-body markdown-content" id="result-content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 3: PHIÊN TÒA GIẢ LẬP & TRANH TỤNG ĐỐI CHẤT -->
+            <div class="view-panel" id="view-court">
+                <div class="court-container">
+                    <div class="court-setup-card" id="court-setup-card">
+                        <div class="court-badge">ADVERSARIAL MOOT COURT ARENA</div>
+                        <h2 class="court-title">Đấu Trường Tranh Tụng & Đối Chất Giả Lập</h2>
+                        <p class="court-desc">
+                            Thử lửa lập luận của bạn trước <strong>Luật Sư Đối Tụng AI</strong> sắc bén và Hội Đồng <strong>Thẩm Phán Nhân Dân</strong> trước khi ra phiên tòa thật!
+                        </p>
+
+                        <div class="court-cases-section">
+                            <div class="section-subtitle">LỰA CHỌN VỤ ÁN TRANH CHẤP MẪU:</div>
+                            <div class="preset-cases-grid" id="preset-cases-grid"></div>
+                        </div>
+
+                        <div class="custom-case-box">
+                            <div class="form-field">
+                                <label for="custom-case-title">Hoặc tự đặt tên vụ án của bạn:</label>
+                                <input type="text" id="custom-case-title" placeholder="Ví dụ: Tranh chấp hợp đồng thuê kho bãi giữa Công ty A và Công ty B">
+                            </div>
+                            <div class="form-field">
+                                <label for="custom-case-facts">Tóm tắt sự việc & Chứng cứ bạn có:</label>
+                                <textarea id="custom-case-facts" class="court-facts-textarea" placeholder="Mô tả sự việc: Ai làm gì, ngày nào, hợp đồng thỏa thuận ra sao, vi phạm thế nào và bạn có chứng cứ gì..."></textarea>
+                            </div>
+                            <div class="form-field">
+                                <label for="custom-user-role">Tư cách tố tụng của bạn:</label>
+                                <select id="custom-user-role">
+                                    <option value="Nguyên đơn (Bên khởi kiện đòi quyền lợi)" selected>Nguyên đơn (Bên khởi kiện đòi bồi thường/quyền lợi)</option>
+                                    <option value="Bị đơn (Bên bị kiện cần bảo vệ)">Bị đơn (Bên bị kiện cần phản bác)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button class="btn-enter-court" id="btn-enter-court">
+                            <span class="icon">🏛️</span>
+                            <span>BƯỚC VÀO PHÒNG XỬ ÁN TRANH TỤNG</span>
+                        </button>
+                    </div>
+
+                    <div class="court-arena" id="court-arena" style="display: none;">
+                        <div class="arena-header">
+                            <div class="arena-case-info">
+                                <span class="arena-gavel-icon">🔨</span>
+                                <div>
+                                    <div class="arena-case-title" id="arena-case-title">Tranh Chấp Sa Thải Trái Luật</div>
+                                    <div class="arena-user-role" id="arena-user-role">Vai trò: Nguyên đơn (Người lao động)</div>
+                                </div>
+                            </div>
+
+                            <div class="persuasion-meter-wrap">
+                                <div class="meter-labels">
+                                    <span>SỨC NẶNG CHỨNG CỨ CỦA BẠN:</span>
+                                    <strong id="meter-score-text">50%</strong>
+                                </div>
+                                <div class="meter-bar-track">
+                                    <div class="meter-bar-fill" id="meter-bar-fill" style="width: 50%;"></div>
+                                </div>
+                            </div>
+
+                            <button class="btn-request-verdict" id="btn-request-verdict" title="Yêu cầu Thẩm phán tuyên án sơ bộ ngay">
+                                <span class="icon">⚖️</span>
+                                <span>Tuyên Án Sơ Bộ</span>
+                            </button>
+                        </div>
+
+                        <div class="arena-transcript" id="arena-transcript"></div>
+
+                        <div class="arena-composer">
+                            <div class="quick-rebuttals">
+                                <span class="rebuttal-label">Phản biện nhanh:</span>
+                                <button type="button" class="rebuttal-chip" data-text="Tôi phản đối! Phía đối phương có nghĩa vụ chứng minh theo Điều 91 Bộ luật Tố tụng Dân sự 2015!">Nghĩa vụ chứng minh (Đ.91 BLTTDS)</button>
+                                <button type="button" class="rebuttal-chip" data-text="Tôi có vi bằng ghi nhận đầy đủ tin nhắn và hành vi vi phạm có giá trị chứng cứ trước Tòa!">Vi bằng hợp pháp</button>
+                                <button type="button" class="rebuttal-chip" data-text="Căn cứ hợp đồng thỏa thuận rõ ràng không có điều khoản cho phép hành vi này!">Căn cứ Hợp đồng</button>
+                            </div>
+
+                            <div class="arena-composer-box">
+                                <textarea 
+                                    id="arena-user-input" 
+                                    class="arena-textarea" 
+                                    placeholder="Trình bày lý lẽ, căn cứ điều luật hoặc phản bác lời luật sư đối phương... (Enter để gửi)" 
+                                    rows="1"
+                                ></textarea>
+                                <button class="btn-court-send" id="btn-court-send" title="Tranh luận">
+                                    <span class="icon">⚔️</span>
+                                    <span>Đối Chất</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="court-verdict-card" id="court-verdict-card" style="display: none;">
+                        <div class="verdict-header">
+                            <div class="verdict-emblem">🔨</div>
+                            <h2 class="verdict-title">BẢN ÁN SƠ BỘ CỦA TÒA ÁN</h2>
+                            <p class="verdict-subtitle">Phán quyết giả định dựa trên toàn bộ biên bản đối chất tranh tụng</p>
+                        </div>
+                        <div class="verdict-body markdown-content" id="verdict-content"></div>
+                        <div class="verdict-footer">
+                            <button class="btn-action" id="btn-copy-verdict">📋 Sao chép Bản Án</button>
+                            <button class="btn-primary" id="btn-replay-court">🔄 Tranh Tụng Lại</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL 1: XEM NGUYÊN VĂN ĐIỀU LUẬT GỐC (RAG LAW INSPECTOR) -->
+    <div class="modal-backdrop" id="law-modal">
+        <div class="modal-card law-modal-card">
+            <div class="modal-header law-modal-header">
+                <div class="law-modal-title-wrap">
+                    <span class="law-seal">🏛️</span>
+                    <div>
+                        <h3 class="modal-title" id="law-modal-title">Điều 35: Quyền đơn phương chấm dứt HĐLĐ</h3>
+                        <span class="law-modal-sub" id="law-modal-sub">Bộ luật Lao động 2019 (Luật số 45/2019/QH14)</span>
+                    </div>
+                </div>
+                <button class="btn-close-modal" id="btn-close-law-modal">&times;</button>
+            </div>
+            <div class="modal-body law-modal-body">
+                <div class="official-notice">
+                    <span>📌 Nguồn xác thực: <strong>Cơ sở dữ liệu Quốc gia về Văn bản Pháp luật (vbpl.vn)</strong></span>
+                </div>
+                <div class="law-full-text" id="law-full-text">
+                    <!-- Nội dung nguyên văn điều luật -->
+                </div>
+            </div>
+            <div class="modal-footer law-modal-footer">
+                <a href="#" target="_blank" rel="noopener noreferrer" class="btn-official-link" id="law-official-link">
+                    <span>🌐 Xem Văn Bản Gốc Trên vbpl.vn</span>
+                </a>
+                <button class="btn-secondary" id="btn-close-law-bottom">Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: CÀI ĐẶT HỆ THỐNG -->
+    <div class="modal" id="settings-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">⚙️ Cài Đặt Kết Nối AI</h3>
+                <button class="btn-close-modal" id="btn-close-settings">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="input-api-key">Mã Khóa API Truy Cập (Gemini API Key):</label>
+                    <div class="input-password-wrap">
+                        <input 
+                            type="password" 
+                            id="input-api-key" 
+                            placeholder="Dán API Key (AIzaSy...) vào đây" 
+                            autocomplete="off"
+                        >
+                        <button type="button" class="btn-toggle-pwd" id="btn-toggle-pwd">👁️</button>
+                    </div>
+                    <small class="form-hint">
+                        Khóa API này được lưu an toàn trong trình duyệt (LocalStorage) của bạn.
+                    </small>
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="btn-clear-key">Xóa Key</button>
+                <button class="btn-primary" id="btn-save-settings">Lưu Cài Đặt</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>

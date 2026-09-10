@@ -1,0 +1,418 @@
+# backend/core/gemini_service.py — Service kết nối Gemini qua Google GenAI SDK tích hợp RAG
+
+import re
+import logging
+from typing import List, Optional
+from google import genai
+from google.genai import types
+
+from backend.core.config import settings
+from backend.core.legal_prompts import (
+    LEGAL_SYSTEM_INSTRUCTION,
+    CONTRACT_REVIEW_SYSTEM_INSTRUCTION,
+    LEGAL_DISCLAIMER
+)
+from backend.core.court_prompts import (
+    OPPOSING_COUNSEL_INSTRUCTION,
+    VERDICT_SYSTEM_INSTRUCTION
+)
+from backend.core.rag_engine import rag_engine
+from backend.models.schemas import (
+    ChatMessage,
+    ChatResponse,
+    ContractReviewResponse,
+    CourtTurnMessage,
+    CourtTurnResponse,
+    VerdictResponse,
+    LawCitation
+)
+
+logger = logging.getLogger("ai_lawyer.gemini")
+
+class GeminiLegalService:
+    def __init__(self):
+        pass
+
+    def _get_client(self, custom_api_key: Optional[str] = None) -> genai.Client:
+        """Khởi tạo Google GenAI client với API key được ưu tiên từ request, sau đó là biến môi trường."""
+        api_key = (custom_api_key or "").strip() or settings.GEMINI_API_KEY
+        if not api_key:
+            raise ValueError(
+                "Chưa gắn API Key trên máy chủ! Vui lòng cấu hình GEMINI_API_KEY trong file .env "
+                "hoặc mở biểu tượng ⚙️ 'Cài đặt Kết nối' để nhập API Key."
+            )
+        return genai.Client(api_key=api_key)
+
+    def _resolve_model(self, model_override: Optional[str] = None) -> str:
+        """Chuẩn hóa model name, tự động dùng model mới nhất nếu model cũ bị deprecated."""
+        model = (model_override or "").strip()
+        if not model or "2.5" in model:
+            return settings.DEFAULT_MODEL
+        return model
+
+    def _generate_with_fallback(self, client: genai.Client, primary_model: str, contents: Any, config: Any):
+        """Gọi model với cơ chế tự động fallback nếu model gặp 503 high demand hoặc 404."""
+        model_queue = [primary_model]
+        for m in ["gemini-3.6-flash", "gemini-flash-latest", "gemini-3.5-flash"]:
+            if m not in model_queue:
+                model_queue.append(m)
+
+        last_error = None
+        for m in model_queue:
+            try:
+                resp = client.models.generate_content(model=m, contents=contents, config=config)
+                return resp, m
+            except Exception as e:
+                err_str = str(e)
+                logger.warning(f"Model {m} failed ({err_str[:80]}), trying next fallback...")
+                last_error = e
+        raise last_error
+
+    async def consult_legal_matter(
+        self,
+        message: str,
+        history: List[ChatMessage] = [],
+        category: str = "Tư vấn Tổng hợp",
+        custom_api_key: Optional[str] = None,
+        model_override: Optional[str] = None
+    ) -> ChatResponse:
+        """Xử lý yêu cầu tư vấn pháp lý với Gemini theo quy chuẩn 4 bước tích hợp RAG."""
+        client = self._get_client(custom_api_key)
+        model_name = self._resolve_model(model_override)
+
+        # 1. RAG Retrieval: Tìm kiếm các điều luật liên quan trong kho dữ liệu chính thống
+        relevant_articles = rag_engine.search(message, category=category, top_k=3)
+
+        rag_context_prompt = ""
+        if relevant_articles:
+            rag_context_prompt = "\n=== VĂN BẢN QUY PHẠM PHÁP LUẬT VIỆT NAM THAM CHIẾU CHÍNH THỨC (NGUỒN VBPL.VN) ===\n"
+            for art in relevant_articles:
+                rag_context_prompt += (
+                    f"\n【{art['law_name']} - {art['article_number']}: {art['article_title']}】\n"
+                    f"{art['content']}\n"
+                    f"Nguồn xác thực Nhà nước: {art['official_source']}\n"
+                )
+            rag_context_prompt += (
+                "\nYÊU CẦU BẮT BUỘC: Hãy trích dẫn chính xác nội dung và căn cứ từ các điều luật chính thức trên "
+                "vào mục '2. ⚖️ Căn cứ pháp lý áp dụng' trong câu trả lời của bạn!\n"
+            )
+
+        contents = []
+        for item in history:
+            role = "model" if item.role in ["assistant", "model"] else "user"
+            contents.append(
+                types.Content(
+                    role=role,
+                    parts=[types.Part.from_text(text=item.content)]
+                )
+            )
+
+        # Gắn kèm chỉ định lĩnh vực và bối cảnh RAG
+        category_header = f"[Lĩnh vực tham vấn: {category}]\n" if category and category != "Tư vấn Tổng hợp" else ""
+        user_content_text = f"{category_header}{rag_context_prompt}\n[Câu hỏi của thân chủ]:\n{message}"
+
+        contents.append(
+            types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=user_content_text)]
+            )
+        )
+
+        config = types.GenerateContentConfig(
+            system_instruction=LEGAL_SYSTEM_INSTRUCTION,
+            temperature=0.2,
+            top_p=0.95,
+        )
+
+        try:
+            response, used_model = self._generate_with_fallback(
+                client=client,
+                primary_model=model_name,
+                contents=contents,
+                config=config,
+            )
+
+            reply_text = response.text if response and response.text else "Không nhận được phản hồi từ mô hình."
+
+            citations_list = [
+                LawCitation(
+                    law_id=a["law_id"],
+                    law_name=a["law_name"],
+                    article_number=a["article_number"],
+                    article_title=a["article_title"],
+                    official_source=a["official_source"],
+                    content=a["content"],
+                    relevance_score=a.get("relevance_score")
+                )
+                for a in relevant_articles
+            ]
+
+            return ChatResponse(
+                success=True,
+                reply=reply_text,
+                category=category,
+                model_used=model_name,
+                disclaimer=LEGAL_DISCLAIMER,
+                citations=citations_list
+            )
+
+        except Exception as e:
+            err_msg = str(e)
+            logger.error(f"Lỗi khi gọi Gemini API: {err_msg}")
+            if "API_KEY_INVALID" in err_msg or "API key not valid" in err_msg:
+                user_err = "Khóa Gemini API Key không hợp lệ. Vui lòng kiểm tra lại trong menu Cài đặt."
+            elif "RESOURCE_EXHAUSTED" in err_msg or "quota" in err_msg.lower():
+                user_err = "Hạn ngạch (Quota) của Gemini API Key hiện tại đã tạm thời hết. Vui lòng thử lại sau hoặc đổi API Key."
+            else:
+                user_err = f"Đã xảy ra lỗi khi kết nối với máy chủ AI: {err_msg}"
+            raise RuntimeError(user_err)
+
+    async def review_contract_document(
+        self,
+        contract_text: str,
+        filename: str,
+        raw_bytes: Optional[bytes] = None,
+        mime_type: Optional[str] = None,
+        party_role: str = "Bên tham gia hợp đồng",
+        focus_areas: Optional[str] = None,
+        custom_api_key: Optional[str] = None,
+        model_override: Optional[str] = None
+    ) -> ContractReviewResponse:
+        """Thẩm định và rà soát hợp đồng theo ma trận 5 phần tích hợp RAG."""
+        client = self._get_client(custom_api_key)
+        model_name = self._resolve_model(model_override)
+
+        # RAG search theo nội dung hợp đồng
+        sample_query = f"{party_role} {focus_areas or ''} {contract_text[:1000]}"
+        relevant_articles = rag_engine.search(sample_query, top_k=3)
+
+        rag_laws_text = ""
+        if relevant_articles:
+            rag_laws_text = "\n=== VĂN BẢN LUẬT THAM CHIẾU ĐỐI CHIẾU ĐIỀU KHOẢN HỢP ĐỒNG (VBPL.VN) ===\n"
+            for art in relevant_articles:
+                rag_laws_text += f"\n【{art['law_name']} - {art['article_number']}: {art['article_title']}】\n{art['content']}\n"
+
+        prompt_instruction = (
+            f"Vui lòng thẩm định hợp đồng đính kèm cho tôi.\n"
+            f"- Vị thế của tôi trong hợp đồng: {party_role}\n"
+            f"- Trọng tâm rà soát: {focus_areas or 'Rà soát toàn diện các điều khoản rủi ro, gài bẫy và vi phạm luật'}\n"
+            f"- Tên tài liệu: {filename}\n"
+            f"{rag_laws_text}\n"
+        )
+
+        parts = [types.Part.from_text(text=prompt_instruction)]
+
+        if contract_text and contract_text.strip():
+            parts.append(
+                types.Part.from_text(
+                    text=f"\n=== NỘI DUNG VĂN BẢN HỢP ĐỒNG ===\n\n{contract_text}"
+                )
+            )
+        elif raw_bytes and mime_type:
+            parts.append(
+                types.Part.from_bytes(
+                    data=raw_bytes,
+                    mime_type=mime_type
+                )
+            )
+        else:
+            raise ValueError("Không tìm thấy nội dung văn bản hợp đồng để thẩm định.")
+
+        contents = [types.Content(role="user", parts=parts)]
+
+        config = types.GenerateContentConfig(
+            system_instruction=CONTRACT_REVIEW_SYSTEM_INSTRUCTION,
+            temperature=0.15,
+            top_p=0.95,
+        )
+
+        try:
+            response, used_model = self._generate_with_fallback(
+                client=client,
+                primary_model=model_name,
+                contents=contents,
+                config=config,
+            )
+
+            result_text = response.text if response and response.text else "Không nhận được kết quả thẩm định."
+
+            citations_list = [
+                LawCitation(
+                    law_id=a["law_id"],
+                    law_name=a["law_name"],
+                    article_number=a["article_number"],
+                    article_title=a["article_title"],
+                    official_source=a["official_source"],
+                    content=a["content"]
+                )
+                for a in relevant_articles
+            ]
+
+            return ContractReviewResponse(
+                success=True,
+                filename=filename,
+                review_result=result_text,
+                model_used=model_name,
+                disclaimer=LEGAL_DISCLAIMER,
+                citations=citations_list
+            )
+
+        except Exception as e:
+            logger.error(f"Lỗi khi rà soát hợp đồng: {str(e)}")
+            raise RuntimeError(f"Lỗi thẩm định hợp đồng: {str(e)}")
+
+    # --- PHIÊN TÒA GIẢ LẬP METHODS (MOOT COURT) ---
+
+    async def simulate_court_turn(
+        self,
+        case_title: str,
+        case_facts: str,
+        user_role: str,
+        user_argument: str,
+        dialogue_history: List[CourtTurnMessage] = [],
+        custom_api_key: Optional[str] = None,
+        model_override: Optional[str] = None
+    ) -> CourtTurnResponse:
+        """Xử lý lượt đối chất phản biện của Luật sư đối phương trong phiên tòa giả lập có RAG."""
+        client = self._get_client(custom_api_key)
+        model_name = self._resolve_model(model_override)
+
+        # RAG search các quy định pháp luật phục vụ bên đối tụng
+        relevant_articles = rag_engine.search(f"{case_title} {user_argument}", top_k=2)
+        law_injection = ""
+        if relevant_articles:
+            law_injection = "\n=== CĂN CỨ LUẬT BẤT LỢI CHO ĐỐI PHƯƠNG ĐỂ BẠN DÙNG TẤN CÔNG ===\n"
+            for a in relevant_articles:
+                law_injection += f"- {a['law_name']} ({a['article_number']}: {a['article_title']}): {a['content'][:300]}...\n"
+
+        history_text = ""
+        for msg in dialogue_history:
+            speaker_label = "BẠN" if msg.speaker == "user" else ("LUẬT SƯ ĐỐI TỤNG" if msg.speaker == "opposing" else "THẨM PHÁN")
+            history_text += f"\n[{speaker_label}]: {msg.text}\n"
+
+        prompt = (
+            f"=== BỐI CẢNH VỤ ÁN TRANH CHẤP TẠI TÒA ===\n"
+            f"Vụ án: {case_title}\n"
+            f"Tình tiết vụ việc: {case_facts}\n"
+            f"Vị thế của người dùng: {user_role}\n"
+            f"Vị thế của bạn: Luật sư đối tụng của bên kia\n\n"
+            f"{law_injection}\n"
+            f"=== DIỄN BIẾN TRANH TỤNG TRƯỚC ĐÓ ===\n{history_text or '(Bắt đầu lượt tranh tụng đầu tiên)'}\n\n"
+            f"=== LỜI KHAI / LẬP LUẬN MỚI NHẤT CỦA NGƯỜI DÙNG ===\n{user_argument}\n\n"
+            f"YÊU CẦU ĐỐI VỚI BẠN:\n"
+            f"1. Phản biện gay gắt, bóc tách sơ hở và chất vấn dồn ép theo quy chuẩn OPPOSING_COUNSEL_INSTRUCTION.\n"
+            f"2. Cuối câu trả lời, hãy kèm 2 dòng đặc biệt để hệ thống chấm điểm:\n"
+            f"SCORE: [Một con số từ 0 đến 100 thể hiện mức độ vững chắc chứng cứ hiện tại của người dùng]\n"
+            f"TIP: [Một câu ngắn gợi ý thân chủ nên đưa ra chứng cứ gì để lật ngược tình thế]"
+        )
+
+        contents = [types.Content(role="user", parts=[types.Part.from_text(text=prompt)])]
+        config = types.GenerateContentConfig(
+            system_instruction=OPPOSING_COUNSEL_INSTRUCTION,
+            temperature=0.3,
+            top_p=0.95,
+        )
+
+        try:
+            response, used_model = self._generate_with_fallback(
+                client=client,
+                primary_model=model_name,
+                contents=contents,
+                config=config,
+            )
+
+            raw_text = response.text or ""
+            persuasion_score = 50
+            tip = None
+
+            score_match = re.search(r"SCORE:\s*(\d+)", raw_text)
+            if score_match:
+                persuasion_score = max(5, min(95, int(score_match.group(1))))
+                raw_text = re.sub(r"SCORE:\s*\d+", "", raw_text)
+
+            tip_match = re.search(r"TIP:\s*(.+)", raw_text)
+            if tip_match:
+                tip = tip_match.group(1).strip()
+                raw_text = re.sub(r"TIP:\s*.+", "", raw_text)
+
+            statement = raw_text.strip()
+
+            citations_list = [
+                LawCitation(
+                    law_id=a["law_id"],
+                    law_name=a["law_name"],
+                    article_number=a["article_number"],
+                    article_title=a["article_title"],
+                    official_source=a["official_source"],
+                    content=a["content"]
+                )
+                for a in relevant_articles
+            ]
+
+            return CourtTurnResponse(
+                speaker="opposing",
+                statement=statement,
+                persuasion_score=persuasion_score,
+                tip=tip,
+                model_used=model_name,
+                citations=citations_list
+            )
+
+        except Exception as e:
+            logger.error(f"Lỗi lượt tranh tụng: {str(e)}")
+            raise RuntimeError(f"Lỗi trong phiên đối chất: {str(e)}")
+
+    async def generate_court_verdict(
+        self,
+        case_title: str,
+        case_facts: str,
+        user_role: str,
+        dialogue_history: List[CourtTurnMessage],
+        custom_api_key: Optional[str] = None,
+        model_override: Optional[str] = None
+    ) -> VerdictResponse:
+        """Thẩm phán tổng kết và tuyên án sơ bộ dựa trên toàn bộ diễn biến tranh tụng."""
+        client = self._get_client(custom_api_key)
+        model_name = self._resolve_model(model_override)
+
+        history_text = ""
+        for msg in dialogue_history:
+            speaker_label = "BẠN" if msg.speaker == "user" else ("LUẬT SƯ ĐỐI TỤNG" if msg.speaker == "opposing" else "THẨM PHÁN")
+            history_text += f"\n[{speaker_label}]: {msg.text}\n"
+
+        prompt = (
+            f"=== HỒ SƠ VỤ ÁN XÉT XỬ ===\n"
+            f"Tên vụ án: {case_title}\n"
+            f"Nội dung sự việc: {case_facts}\n"
+            f"Tư cách tố tụng của người dùng: {user_role}\n\n"
+            f"=== TOÀN BỘ BIÊN BẢN PHIÊN TRANH TỤNG TẠI TÒA ===\n{history_text}\n\n"
+            f"Yêu cầu: Hãy đóng vai Hội Đồng Xét Xử tuyên bản án sơ bộ theo đúng quy định VERDICT_SYSTEM_INSTRUCTION."
+        )
+
+        contents = [types.Content(role="user", parts=[types.Part.from_text(text=prompt)])]
+        config = types.GenerateContentConfig(
+            system_instruction=VERDICT_SYSTEM_INSTRUCTION,
+            temperature=0.2,
+            top_p=0.95,
+        )
+
+        try:
+            response, used_model = self._generate_with_fallback(
+                client=client,
+                primary_model=model_name,
+                contents=contents,
+                config=config,
+            )
+
+            verdict_text = response.text or "Không thể tạo bản án sơ bộ."
+
+            return VerdictResponse(
+                success=True,
+                verdict_markdown=verdict_text,
+                model_used=model_name
+            )
+        except Exception as e:
+            logger.error(f"Lỗi tuyên án: {str(e)}")
+            raise RuntimeError(f"Lỗi khi ban hành phán quyết: {str(e)}")
+
+legal_service = GeminiLegalService()

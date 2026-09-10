@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+# Environment Variables & Secrets (CRITICAL)
+.env
+
+# Large Binaries
+cloudflared.exe
+*.exe
+
+# IDE & OS
+.agents/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

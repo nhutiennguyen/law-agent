@@ -1,0 +1,32 @@
+[
+  {
+    "law_id": "ltm_2005",
+    "law_name": "Luật Thương mại 2005 (Luật số 36/2005/QH11)",
+    "article_number": "Điều 300",
+    "article_title": "Phạt vi phạm",
+    "official_source": "https://vbpl.vn/TW/Pages/vbpq-toanvan.aspx?ItemID=18587",
+    "effective_date": "01/01/2006",
+    "keywords": ["phạt vi phạm hợp đồng thương mại", "thỏa thuận phạt vi phạm", "hợp đồng kinh tế"],
+    "content": "Phạt vi phạm là việc bên bị vi phạm yêu cầu bên vi phạm trả một khoản tiền phạt do vi phạm hợp đồng nếu trong hợp đồng có thoả thuận, trừ các trường hợp miễn trách nhiệm quy định tại Điều 294 của Luật này."
+  },
+  {
+    "law_id": "ltm_2005",
+    "law_name": "Luật Thương mại 2005 (Luật số 36/2005/QH11)",
+    "article_number": "Điều 301",
+    "article_title": "Mức phạt vi phạm",
+    "official_source": "https://vbpl.vn/TW/Pages/vbpq-toanvan.aspx?ItemID=18587",
+    "effective_date": "01/01/2006",
+    "keywords": ["mức phạt vi phạm tối đa", "trần phạt 8%", "tối đa 8%", "phần nghĩa vụ hợp đồng bị vi phạm"],
+    "content": "Mức phạt đối với vi phạm nghĩa vụ hợp đồng hoặc tổng mức phạt đối với nhiều vi phạm do các bên thoả thuận trong hợp đồng, nhưng không quá 8% giá trị phần nghĩa vụ hợp đồng bị vi phạm, trừ trường hợp quy định tại Điều 266 của Luật này."
+  },
+  {
+    "law_id": "ltm_2005",
+    "law_name": "Luật Thương mại 2005 (Luật số 36/2005/QH11)",
+    "article_number": "Điều 294",
+    "article_title": "Các trường hợp miễn trách nhiệm đối với hành vi vi phạm",
+    "official_source": "https://vbpl.vn/TW/Pages/vbpq-toanvan.aspx?ItemID=18587",
+    "effective_date": "01/01/2006",
+    "keywords": ["miễn trách nhiệm", "bất khả kháng", "sự kiện bất khả kháng", "lỗi của bên kia", "quyết định của cơ quan nhà nước"],
+    "content": "1. Bên vi phạm hợp đồng được miễn trách nhiệm trong các trường hợp sau đây:\na) Xảy ra trường hợp miễn trách nhiệm mà các bên đã thoả thuận;\nb) Xảy ra sự kiện bất khả kháng;\nc) Hành vi vi phạm của một bên hoàn toàn do lỗi của bên kia;\nd) Hành vi vi phạm của một bên do thực hiện quyết định của cơ quan quản lý nhà nước có thẩm quyền mà các bên không thể biết được vào thời điểm giao kết hợp đồng.\n2. Bên vi phạm hợp đồng có nghĩa vụ chứng minh các trường hợp miễn trách nhiệm."
+  }
+]
