@@ -34,6 +34,19 @@ LEGAL_ACRONYMS_MAP = {
     "tố tụng dân sự": "blttds_2015",
     "bltths": "bltths_2015",
     "tố tụng hình sự": "bltths_2015",
+    "nghị định 100": "traffic_decree_100_123",
+    "nđ 100": "traffic_decree_100_123",
+    "nđ100": "traffic_decree_100_123",
+    "nđ 123": "traffic_decree_100_123",
+    "giao thông": "traffic_decree_100_123",
+    "bhxh": "social_insurance_2024",
+    "bảo hiểm xã hội": "social_insurance_2024",
+    "thuế": "tax_property_laws",
+    "thuế tncn": "tax_property_laws",
+    "thuế nhà đất": "tax_property_laws",
+    "án lệ": "supreme_court_precedents",
+    "an le": "supreme_court_precedents",
+    "tandtc": "supreme_court_precedents",
 }
 
 # Bản đồ phát hiện Domain theo từ khóa chuyên môn
@@ -71,6 +84,21 @@ DOMAIN_KEYWORDS = {
     ],
     "housing": [
         "nhà ở", "thuê nhà ở", "chấm dứt thuê nhà", "đòi nhà"
+    ],
+    "traffic": [
+        "nồng độ cồn", "thổi cồn", "tốc độ", "chạy quá tốc độ", "vượt đèn đỏ", "tước bằng lái", 
+        "gplx", "giữ xe", "xe máy", "ô tô", "tai nạn giao thông", "nghị định 100", "nghị định 123", "khí thở"
+    ],
+    "social_insurance": [
+        "bhxh", "bảo hiểm xã hội", "rút 1 lần", "rút một lần", "thai sản", "nghỉ sinh con", 
+        "ốm đau", "hưu trí", "trợ cấp thất nghiệp", "đóng bảo hiểm", "sổ bảo hiểm"
+    ],
+    "tax": [
+        "thuế", "thu nhập cá nhân", "thuế tncn", "giảm trừ gia cảnh", "người phụ thuộc", 
+        "lũy tiến", "thuế bán đất", "thuế chuyển nhượng", "lệ phí trước bạ", "miễn thuế bán nhà"
+    ],
+    "precedents": [
+        "án lệ", "án lệ 02", "án lệ 25", "án lệ 04", "nhờ đứng tên", "tiền lệ", "tòa án nhân dân tối cao", "phán quyết án lệ"
     ]
 }
 

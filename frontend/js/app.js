@@ -796,8 +796,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const data = await response.json();
-            appendMessage('assistant', data.reply, data.citations);
-            currentHistory.push({ role: 'assistant', content: data.reply, citations: data.citations });
+            appendMessage('assistant', data.reply, data.citations, data.follow_ups);
+            currentHistory.push({
+                role: 'assistant',
+                content: data.reply,
+                citations: data.citations,
+                follow_ups: data.follow_ups
+            });
 
             saveSessionRecord(text);
         } catch (error) {
@@ -806,7 +811,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function appendMessage(role, content, citations = []) {
+    function appendMessage(role, content, citations = [], followUps = []) {
         const row = document.createElement('div');
         row.className = `message-row ${role}`;
 
@@ -818,7 +823,7 @@ document.addEventListener('DOMContentLoaded', () => {
         bubble.className = 'message-bubble';
         bubble.innerHTML = role === 'assistant' ? marked.parse(content) : escapeHtml(content);
 
-        // Render RAG Official Law Citations
+        // 1. Render RAG Official Law Citations
         if (role === 'assistant' && citations && citations.length > 0) {
             const citeContainer = document.createElement('div');
             citeContainer.className = 'law-citations-container';
@@ -831,14 +836,42 @@ document.addEventListener('DOMContentLoaded', () => {
                 const badge = document.createElement('button');
                 badge.className = 'law-citation-badge';
                 badge.type = 'button';
+                const artTitle = c.article_title || c.title || c.law_name || 'Điều luật';
+                const artSrc = c.official_source || c.source || 'vbpl.vn';
                 badge.title = `Nhấn để xem nguyên văn ${c.article_number} (${c.law_name})`;
-                badge.innerHTML = `<span class="badge-icon">📖</span> <strong>${escapeHtml(c.article_number)}</strong>: ${escapeHtml(c.title || c.law_name)} <span class="badge-source">${escapeHtml(c.source || 'vbpl.vn')}</span>`;
+                badge.innerHTML = `<span class="badge-icon">📖</span> <strong>${escapeHtml(c.article_number)}</strong>: ${escapeHtml(artTitle)} <span class="badge-source">${escapeHtml(artSrc)}</span>`;
                 badge.addEventListener('click', () => {
                     openLawModal(c);
                 });
                 citeList.appendChild(badge);
             });
             bubble.appendChild(citeContainer);
+        }
+
+        // 2. Render Interactive Socratic Follow-up Chips
+        if (role === 'assistant' && followUps && followUps.length > 0) {
+            const followUpContainer = document.createElement('div');
+            followUpContainer.className = 'follow-ups-container';
+            followUpContainer.innerHTML = `
+                <div class="follow-ups-title">💡 GỢI Ý BƯỚC TIẾP THEO DÀNH CHO BẠN:</div>
+                <div class="follow-ups-list"></div>
+            `;
+            const followUpList = followUpContainer.querySelector('.follow-ups-list');
+            followUps.forEach(prompt => {
+                const chip = document.createElement('button');
+                chip.className = 'follow-up-chip';
+                chip.type = 'button';
+                chip.innerHTML = `<span class="chip-icon">💬</span> <span>${escapeHtml(prompt)}</span>`;
+                chip.addEventListener('click', () => {
+                    userInput.value = prompt;
+                    userInput.style.height = 'auto';
+                    userInput.style.height = Math.min(userInput.scrollHeight, 160) + 'px';
+                    btnSend.disabled = false;
+                    sendMessage();
+                });
+                followUpList.appendChild(chip);
+            });
+            bubble.appendChild(followUpContainer);
         }
 
         if (role === 'user') {
@@ -855,10 +888,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function openLawModal(lawCitation) {
-        lawModalTitle.textContent = `${lawCitation.article_number}: ${lawCitation.title || 'Nội dung điều luật'}`;
-        lawModalSub.textContent = `Văn bản: ${lawCitation.law_name} • Nguồn: ${lawCitation.source || 'Cơ sở dữ liệu Quốc gia vbpl.vn'}`;
-        lawFullText.textContent = lawCitation.full_text || 'Đang tải nội dung văn bản...';
-        lawOfficialLink.href = lawCitation.url || 'https://vbpl.vn';
+        const artNum = lawCitation.article_number || 'Điều luật';
+        const artTitle = lawCitation.article_title || lawCitation.title || 'Nội dung điều luật';
+        const lawName = lawCitation.law_name || 'Văn bản quy phạm pháp luật';
+        const officialSrc = lawCitation.official_source || lawCitation.source || 'Cơ sở dữ liệu Quốc gia vbpl.vn';
+        const fullContent = lawCitation.content || lawCitation.full_text || 'Đang cập nhật nội dung...';
+        const officialUrl = lawCitation.official_source || lawCitation.url || 'https://vbpl.vn';
+
+        lawModalTitle.textContent = `${artNum}: ${artTitle}`;
+        lawModalSub.textContent = `Văn bản: ${lawName} • Nguồn: ${officialSrc}`;
+        lawFullText.textContent = fullContent;
+        lawOfficialLink.href = officialUrl.startsWith('http') ? officialUrl : 'https://vbpl.vn';
         lawModal.classList.add('open');
     }
 
@@ -975,7 +1015,7 @@ document.addEventListener('DOMContentLoaded', () => {
         welcomeScreen.style.display = 'none';
         messagesList.innerHTML = '';
 
-        currentHistory.forEach(msg => appendMessage(msg.role, msg.content, msg.citations));
+        currentHistory.forEach(msg => appendMessage(msg.role, msg.content, msg.citations, msg.follow_ups));
         renderHistory();
     }
 

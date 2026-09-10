@@ -4,6 +4,15 @@ import re
 import logging
 import unicodedata
 from typing import List, Optional, Any, Dict
+
+# Tự động nạp chứng chỉ gốc từ hệ điều hành (Windows Certificate Store)
+# để khắc phục lỗi SSL khi chạy qua Avast, Kaspersky hoặc Corporate Proxy
+try:
+    import truststore
+    truststore.inject_into_ssl()
+except Exception:
+    pass
+
 from google import genai
 from google.genai import types
 
@@ -52,9 +61,16 @@ class GeminiLegalService:
         return model
 
     def _generate_with_fallback(self, client: genai.Client, primary_model: str, contents: Any, config: Any):
-        """Gọi model với cơ chế tự động fallback nếu model gặp 503 high demand hoặc 404."""
+        """Gọi model với cơ chế tự động fallback nếu model gặp 503 high demand hoặc 429 quota."""
         model_queue = [primary_model]
-        for m in ["gemini-3.6-flash", "gemini-flash-latest", "gemini-3.5-flash"]:
+        for m in [
+            "gemini-3.6-flash",
+            "gemini-3.7-flash",
+            "gemini-3.5-flash",
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",
+            "gemini-flash-latest"
+        ]:
             if m not in model_queue:
                 model_queue.append(m)
 
@@ -110,6 +126,39 @@ class GeminiLegalService:
 
         return False
 
+    def _extract_follow_ups(self, text: str) -> tuple[str, List[str]]:
+        """Tách khối [GỢI Ý HỎI TIẾP] khỏi văn bản trả lời để hiển thị chip tương tác mượt mà."""
+        follow_ups = []
+        cleaned_text = text
+
+        # 1. Tìm khối chuẩn [GỢI Ý HỎI TIẾP]
+        pattern = r'\[GỢI Ý HỎI TIẾP\]\s*:\s*\n?((?:[-*•\d\.]\s*[^\n]+\n?)+)'
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            block = match.group(1)
+            lines = [line.strip() for line in block.split('\n') if line.strip()]
+            for line in lines:
+                cleaned_line = re.sub(r'^[-*•\d\.]+\s*', '', line).strip()
+                cleaned_line = cleaned_line.strip('<>[]{}"\'')
+                if cleaned_line and len(cleaned_line) > 5:
+                    follow_ups.append(cleaned_line)
+            cleaned_text = text[:match.start()].rstrip()
+        else:
+            # 2. Pattern linh hoạt nếu model trả về không có ngoặc vuông
+            alt_pattern = r'(?:GỢI Ý HỎI TIẾP|CÂU HỎI GỢI Ý|HƯỚNG ĐI TIẾP THEO)\s*:\s*\n?((?:[-*•\d\.]\s*[^\n]+\n?)+)'
+            alt_match = re.search(alt_pattern, text, flags=re.IGNORECASE)
+            if alt_match:
+                block = alt_match.group(1)
+                lines = [line.strip() for line in block.split('\n') if line.strip()]
+                for line in lines:
+                    cleaned_line = re.sub(r'^[-*•\d\.]+\s*', '', line).strip()
+                    cleaned_line = cleaned_line.strip('<>[]{}"\'')
+                    if cleaned_line and len(cleaned_line) > 5:
+                        follow_ups.append(cleaned_line)
+                cleaned_text = text[:alt_match.start()].rstrip()
+
+        return cleaned_text, follow_ups[:4]
+
     async def consult_legal_matter(
         self,
         message: str,
@@ -147,7 +196,7 @@ class GeminiLegalService:
                 "\n[CHỈ DẪN QUAN TRỌNG]: Người dùng đang chào hỏi hoặc hỏi về danh tính / người sáng lập của bạn. "
                 "Hãy trả lời thật tự nhiên, thông minh, lịch sự, thân thiện và ấm áp. "
                 "Khẳng định rõ bạn là 'Huỳnh Nguyên Khang' — trợ lý cố vấn pháp lý AI được sáng lập và phát triển bởi 'Bố Bảo'. "
-                "TUYỆT ĐỐI KHÔNG trích dẫn điều luật hay phân tích cấu trúc 4 bước hành chính vào câu trả lời này.\n"
+                "TUYỆT ĐỐI KHÔNG trích dẫn điều luật hay phân tích cấu trúc hành chính vào câu trả lời này.\n"
             )
 
         contents = []
@@ -185,7 +234,10 @@ class GeminiLegalService:
                 config=config,
             )
 
-            reply_text = response.text if response and response.text else "Không nhận được phản hồi từ mô hình."
+            raw_reply_text = response.text if response and response.text else "Không nhận được phản hồi từ mô hình."
+
+            # Tách khối gợi ý hỏi tiếp để hiển thị chip tương tác mượt mà
+            clean_reply, follow_ups = self._extract_follow_ups(raw_reply_text)
 
             citations_list = [
                 LawCitation(
@@ -202,11 +254,12 @@ class GeminiLegalService:
 
             return ChatResponse(
                 success=True,
-                reply=reply_text,
+                reply=clean_reply,
                 category=category,
-                model_used=model_name,
+                model_used=used_model,
                 disclaimer=LEGAL_DISCLAIMER,
-                citations=citations_list
+                citations=citations_list,
+                follow_ups=follow_ups
             )
 
         except Exception as e:

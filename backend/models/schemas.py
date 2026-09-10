@@ -34,6 +34,7 @@ class ChatResponse(BaseModel):
     model_used: str = Field(..., description="Model Gemini đã xử lý")
     disclaimer: str = Field(..., description="Lời nhắc miễn trừ trách nhiệm pháp lý")
     citations: List[LawCitation] = Field(default=[], description="Các điều luật chính thống được đối chiếu qua RAG")
+    follow_ups: List[str] = Field(default=[], description="Các câu hỏi / hướng hành động gợi ý tiếp theo")
 
 class HealthResponse(BaseModel):
     status: str
