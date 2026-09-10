@@ -11,5 +11,5 @@ if __name__ == "__main__":
         port = 8000
 
     host = os.getenv("HOST", "0.0.0.0")
-    print(f"Starting Huynh Nguyen Khang Father on {host}:{port}...", flush=True)
+    print(f"Starting Huynh Nguyen Khang on {host}:{port}...", flush=True)
     uvicorn.run("backend.main:app", host=host, port=port)
