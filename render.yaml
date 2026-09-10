@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: ai-lawyer-huynhnguyenkhang
+    runtime: docker
+    plan: free
+    region: singapore
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.6-flash
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: 8000
