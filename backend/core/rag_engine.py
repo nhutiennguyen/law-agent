@@ -38,7 +38,11 @@ LEGAL_ACRONYMS_MAP = {
     "nđ 100": "traffic_decree_100_123",
     "nđ100": "traffic_decree_100_123",
     "nđ 123": "traffic_decree_100_123",
-    "giao thông": "traffic_decree_100_123",
+    "giao thông": "traffic_safety_law_2024",
+    "lttatgtdb": "traffic_safety_law_2024",
+    "trừ điểm bằng lái": "traffic_safety_law_2024",
+    "12 điểm": "traffic_safety_law_2024",
+    "trẻ em ô tô": "traffic_safety_law_2024",
     "bhxh": "social_insurance_2024",
     "bảo hiểm xã hội": "social_insurance_2024",
     "thuế": "tax_property_laws",
@@ -47,6 +51,13 @@ LEGAL_ACRONYMS_MAP = {
     "án lệ": "supreme_court_precedents",
     "an le": "supreme_court_precedents",
     "tandtc": "supreme_court_precedents",
+    "lkdbds": "real_estate_business_law_2023",
+    "kinh doanh bất động sản": "real_estate_business_law_2023",
+    "kdbds": "real_estate_business_law_2023",
+    "căn cước": "id_law_2023",
+    "thẻ căn cước": "id_law_2023",
+    "luật căn cước": "id_law_2023",
+    "cmnd": "id_law_2023",
 }
 
 # Bản đồ phát hiện Domain theo từ khóa chuyên môn
@@ -65,7 +76,8 @@ DOMAIN_KEYWORDS = {
     ],
     "land": [
         "sổ đỏ", "chuyển nhượng đất", "bán đất", "thu hồi đất", "bồi thường đất", "đất đai", 
-        "quyền sử dụng đất", "đất không có giấy tờ", "tranh chấp đất", "giải tỏa"
+        "quyền sử dụng đất", "đất không có giấy tờ", "tranh chấp đất", "giải tỏa", "cọc 5%",
+        "kinh doanh bất động sản", "môi giới tự do", "bảng giá đất 2026", "bỏ khung giá đất", "bảng giá đất hàng năm"
     ],
     "corporate": [
         "cổ phần", "cổ đông", "vốn góp", "công ty tnhh", "đại diện pháp luật", "doanh nghiệp", 
@@ -73,7 +85,8 @@ DOMAIN_KEYWORDS = {
     ],
     "civil": [
         "thừa kế", "di chúc", "đặt cọc", "phạt cọc", "vô hiệu", "hợp đồng thuê", "dân sự", 
-        "chậm trả tiền", "lãi suất", "phạt vi phạm", "hàng thừa kế", "thời hiệu khởi kiện"
+        "chậm trả tiền", "lãi suất", "phạt vi phạm", "hàng thừa kế", "thời hiệu khởi kiện",
+        "thẻ căn cước", "cmnd hết hạn", "mống mắt", "vneid", "đổi căn cước", "khai tử cmnd", "01/01/2025"
     ],
     "procedure": [
         "tạm giữ", "tạm giam", "người bào chữa", "luật sư bào chữa", "khởi tố", "chứng cứ", 
@@ -87,11 +100,12 @@ DOMAIN_KEYWORDS = {
     ],
     "traffic": [
         "nồng độ cồn", "thổi cồn", "tốc độ", "chạy quá tốc độ", "vượt đèn đỏ", "tước bằng lái", 
-        "gplx", "giữ xe", "xe máy", "ô tô", "tai nạn giao thông", "nghị định 100", "nghị định 123", "khí thở"
+        "gplx", "giữ xe", "xe máy", "ô tô", "tai nạn giao thông", "nghị định 100", "nghị định 123", "khí thở",
+        "trừ điểm", "12 điểm", "điểm gplx", "trẻ em ô tô", "an toàn trẻ em", "luật trật tự an toàn giao thông", "ghế trẻ em"
     ],
     "social_insurance": [
         "bhxh", "bảo hiểm xã hội", "rút 1 lần", "rút một lần", "thai sản", "nghỉ sinh con", 
-        "ốm đau", "hưu trí", "trợ cấp thất nghiệp", "đóng bảo hiểm", "sổ bảo hiểm"
+        "ốm đau", "hưu trí", "trợ cấp thất nghiệp", "đóng bảo hiểm", "sổ bảo hiểm", "15 năm", "đóng 15 năm", "lương hưu 15 năm"
     ],
     "tax": [
         "thuế", "thu nhập cá nhân", "thuế tncn", "giảm trừ gia cảnh", "người phụ thuộc", 
