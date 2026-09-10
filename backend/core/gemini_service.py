@@ -2,7 +2,7 @@
 
 import re
 import logging
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 from google import genai
 from google.genai import types
 
