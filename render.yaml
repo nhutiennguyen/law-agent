@@ -1,15 +1,15 @@
 services:
   - type: web
     name: huynh-nguyen-khang-father
-    runtime: docker
+    runtime: python
     plan: free
-    region: singapore
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
         value: gemini-3.6-flash
-      - key: HOST
-        value: 0.0.0.0
-      - key: PORT
-        value: 8000
+      - key: PYTHON_VERSION
+        value: 3.12.0
