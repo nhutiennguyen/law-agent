@@ -68,6 +68,36 @@ class GeminiLegalService:
                 last_error = e
         raise last_error
 
+    def _is_conversational_or_meta_query(self, message: str) -> bool:
+        """Nhận diện các câu hỏi chào hỏi, hỏi danh tính, hỏi người sáng lập để không kích hoạt RAG luật máy móc."""
+        msg = message.strip().lower()
+        cleaned = re.sub(r'[^\w\s]', '', msg).strip()
+
+        # Chào hỏi thông thường
+        greetings = [
+            "chao", "chào", "hello", "hi", "alo", "ê", "bạn ơi", "ban oi", "hi bạn", "hey",
+            "chào bạn", "chao ban", "chào bot", "chao bot", "xin chào", "xin chao"
+        ]
+        if cleaned in greetings or any(cleaned == g for g in greetings):
+            return True
+
+        # Danh tính / Người sáng lập / Bố Bảo / Huỳnh Nguyên Khang
+        meta_patterns = [
+            "ai sáng lập", "ai sang lap", "người sáng lập", "nguoi sang lap",
+            "ai tạo ra bạn", "ai tao ra ban", "ai làm ra bạn", "ai lam ra ban",
+            "ai viết ra bạn", "ai viet ra ban", "cha đẻ", "cha de", "bố bảo", "bo bao",
+            "huỳnh nguyên khang", "huynh nguyen khang", "bạn là ai", "ban la ai",
+            "tên gì", "ten gi", "bạn tên gì", "ban ten gi", "bạn tên là gì", "ban ten la gi",
+            "bạn làm được gì", "ban lam duoc gi", "bạn giúp được gì", "ban giup duoc gi",
+            "ông chủ của bạn", "ong chu cua ban", "ai phát triển", "ai phat trien",
+            "sáng lập viên", "tac gia", "tác giả"
+        ]
+        for pat in meta_patterns:
+            if pat in msg:
+                return True
+
+        return False
+
     async def consult_legal_matter(
         self,
         message: str,
@@ -76,25 +106,36 @@ class GeminiLegalService:
         custom_api_key: Optional[str] = None,
         model_override: Optional[str] = None
     ) -> ChatResponse:
-        """Xử lý yêu cầu tư vấn pháp lý với Gemini theo quy chuẩn 4 bước tích hợp RAG."""
+        """Xử lý yêu cầu tư vấn pháp lý với Gemini theo phong cách luật sư thực chiến, tự nhiên."""
         client = self._get_client(custom_api_key)
         model_name = self._resolve_model(model_override)
 
-        # 1. RAG Retrieval: Tìm kiếm các điều luật liên quan trong kho dữ liệu chính thống
-        relevant_articles = rag_engine.search(message, category=category, top_k=3)
+        is_meta = self._is_conversational_or_meta_query(message)
 
+        # 1. RAG Retrieval: Chỉ tìm kiếm các điều luật nếu đây là tình huống pháp luật thực sự
+        relevant_articles = []
         rag_context_prompt = ""
-        if relevant_articles:
-            rag_context_prompt = "\n=== VĂN BẢN QUY PHẠM PHÁP LUẬT VIỆT NAM THAM CHIẾU CHÍNH THỨC (NGUỒN VBPL.VN) ===\n"
-            for art in relevant_articles:
+
+        if not is_meta:
+            relevant_articles = rag_engine.search(message, category=category, top_k=3)
+            if relevant_articles:
+                rag_context_prompt = "\n=== VĂN BẢN QUY PHẠM PHÁP LUẬT THAM CHIẾU (NGUỒN CHÍNH THỐNG VBPL.VN) ===\n"
+                for art in relevant_articles:
+                    rag_context_prompt += (
+                        f"\n【{art['law_name']} - {art['article_number']}: {art['article_title']}】\n"
+                        f"{art['content']}\n"
+                        f"Nguồn xác thực Nhà nước: {art['official_source']}\n"
+                    )
                 rag_context_prompt += (
-                    f"\n【{art['law_name']} - {art['article_number']}: {art['article_title']}】\n"
-                    f"{art['content']}\n"
-                    f"Nguồn xác thực Nhà nước: {art['official_source']}\n"
+                    "\nLƯU Ý DÀNH CHO BẠN: Hãy vận dụng các điều luật trên vào phân tích thực tế một cách tự nhiên, "
+                    "dễ hiểu, giải thích thẳng vào câu trả lời thân chủ cần. Tránh chép nguyên văn khô cứng như sách giáo khoa!\n"
                 )
-            rag_context_prompt += (
-                "\nYÊU CẦU BẮT BUỘC: Hãy trích dẫn chính xác nội dung và căn cứ từ các điều luật chính thức trên "
-                "vào mục '2. ⚖️ Căn cứ pháp lý áp dụng' trong câu trả lời của bạn!\n"
+        else:
+            rag_context_prompt = (
+                "\n[CHỈ DẪN QUAN TRỌNG]: Người dùng đang chào hỏi hoặc hỏi về danh tính / người sáng lập của bạn. "
+                "Hãy trả lời thật tự nhiên, thông minh, lịch sự, thân thiện và ấm áp. "
+                "Khẳng định rõ bạn là 'Huỳnh Nguyên Khang Father' — trợ lý cố vấn pháp lý AI được sáng lập và phát triển bởi 'Bố Bảo'. "
+                "TUYỆT ĐỐI KHÔNG trích dẫn điều luật hay phân tích cấu trúc 4 bước hành chính vào câu trả lời này.\n"
             )
 
         contents = []
@@ -107,9 +148,9 @@ class GeminiLegalService:
                 )
             )
 
-        # Gắn kèm chỉ định lĩnh vực và bối cảnh RAG
-        category_header = f"[Lĩnh vực tham vấn: {category}]\n" if category and category != "Tư vấn Tổng hợp" else ""
-        user_content_text = f"{category_header}{rag_context_prompt}\n[Câu hỏi của thân chủ]:\n{message}"
+        # Gắn kèm chỉ định lĩnh vực và bối cảnh
+        category_header = f"[Lĩnh vực tham vấn: {category}]\n" if category and category != "Tư vấn Tổng hợp" and not is_meta else ""
+        user_content_text = f"{category_header}{rag_context_prompt}\n[Câu hỏi của người dùng]:\n{message}"
 
         contents.append(
             types.Content(
@@ -120,7 +161,7 @@ class GeminiLegalService:
 
         config = types.GenerateContentConfig(
             system_instruction=LEGAL_SYSTEM_INSTRUCTION,
-            temperature=0.2,
+            temperature=0.5 if is_meta else 0.35,
             top_p=0.95,
         )
 
