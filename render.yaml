@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: ai-lawyer-huynhnguyenkhang
+    name: huynh-nguyen-khang-father
     runtime: docker
     plan: free
     region: singapore

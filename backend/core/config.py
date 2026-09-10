@@ -14,7 +14,7 @@ else:
     load_dotenv()
 
 class Settings:
-    PROJECT_NAME: str = "AI Lawyer - Cố Vấn Pháp Lý Trí Tuệ Nhân Tạo"
+    PROJECT_NAME: str = "Huỳnh Nguyên Khang Father - Cố Vấn Pháp Lý Trí Tuệ Nhân Tạo"
     VERSION: str = "1.0.0"
     
     # Khóa bí mật & Cấu hình Gemini
