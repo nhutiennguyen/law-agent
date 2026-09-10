@@ -2,6 +2,7 @@
 
 import re
 import logging
+import unicodedata
 from typing import List, Optional, Any, Dict
 from google import genai
 from google.genai import types
@@ -70,31 +71,42 @@ class GeminiLegalService:
 
     def _is_conversational_or_meta_query(self, message: str) -> bool:
         """Nhận diện các câu hỏi chào hỏi, hỏi danh tính, hỏi người sáng lập để không kích hoạt RAG luật máy móc."""
-        msg = message.strip().lower()
-        cleaned = re.sub(r'[^\w\s]', '', msg).strip()
+        # Chuẩn hóa loại bỏ toàn bộ dấu tiếng Việt để so khớp không bao giờ trượt
+        nfkd = unicodedata.normalize('NFKD', message.strip().lower())
+        norm = ''.join([c for c in nfkd if not unicodedata.combining(c)]).replace('đ', 'd').replace('Đ', 'D').strip()
+        cleaned = re.sub(r'[^\w\s]', '', norm).strip()
 
-        # Chào hỏi thông thường
+        # 1. Chào hỏi thông thường
         greetings = [
-            "chao", "chào", "hello", "hi", "alo", "ê", "bạn ơi", "ban oi", "hi bạn", "hey",
-            "chào bạn", "chao ban", "chào bot", "chao bot", "xin chào", "xin chao"
+            "chao", "hello", "hi", "alo", "e", "ban oi", "hi ban", "hey",
+            "chao ban", "chao bot", "xin chao", "chao cau", "chao em"
         ]
         if cleaned in greetings or any(cleaned == g for g in greetings):
             return True
 
-        # Danh tính / Người sáng lập / Bố Bảo / Huỳnh Nguyên Khang
-        meta_patterns = [
-            "ai sáng lập", "ai sang lap", "người sáng lập", "nguoi sang lap",
-            "ai tạo ra bạn", "ai tao ra ban", "ai làm ra bạn", "ai lam ra ban",
-            "ai viết ra bạn", "ai viet ra ban", "cha đẻ", "cha de", "bố bảo", "bo bao",
-            "huỳnh nguyên khang", "huynh nguyen khang", "bạn là ai", "ban la ai",
-            "tên gì", "ten gi", "bạn tên gì", "ban ten gi", "bạn tên là gì", "ban ten la gi",
-            "bạn làm được gì", "ban lam duoc gi", "bạn giúp được gì", "ban giup duoc gi",
-            "ông chủ của bạn", "ong chu cua ban", "ai phát triển", "ai phat trien",
-            "sáng lập viên", "tac gia", "tác giả"
+        # 2. Đề cập trực tiếp tới Bố Bảo hoặc Huỳnh Nguyên Khang
+        if "bo bao" in norm or "huynh nguyen khang" in norm:
+            return True
+
+        # 3. Hỏi về người sáng lập / tác giả / nguồn gốc
+        creator_words = [
+            "sang lap", "tao ra", "lam ra", "viet ra", "sinh ra", "phat trien",
+            "cha de", "ong chu", "tac gia", "lap trinh", "day ban", "code ra"
         ]
-        for pat in meta_patterns:
-            if pat in msg:
-                return True
+        if any(w in norm for w in creator_words) and any(w in norm for w in ["ai", "nguoi", "ban", "bot", "sao"]):
+            return True
+
+        # 4. Hỏi về danh tính / bạn là ai / bạn tên gì
+        if any(p in norm for p in ["ban la ai", "ten gi", "ban ten", "may la ai", "bot la ai"]):
+            return True
+
+        # 5. Hỏi về khả năng / bạn làm được gì
+        if any(p in norm for p in ["lam duoc gi", "giup duoc gi", "biet gi", "tinh nang", "huong dan"]):
+            return True
+
+        # 6. Khen ngợi / Cảm ơn / Tán gẫu ngắn
+        if cleaned in ["cam on", "thank you", "thanks", "ok", "oke", "tuyet voi", "gioi qua", "hay qua"]:
+            return True
 
         return False
 
