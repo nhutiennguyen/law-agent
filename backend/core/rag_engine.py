@@ -58,6 +58,20 @@ LEGAL_ACRONYMS_MAP = {
     "thẻ căn cước": "id_law_2023",
     "luật căn cước": "id_law_2023",
     "cmnd": "id_law_2023",
+    "tổ chức tín dụng": "credit_institutions_law_2024",
+    "ép mua bảo hiểm": "credit_institutions_law_2024",
+    "bancassurance": "credit_institutions_law_2024",
+    "luật thủ đô": "capital_law_2024",
+    "cắt điện": "capital_law_2024",
+    "cắt nước": "capital_law_2024",
+    "công chứng điện tử": "notary_law_2024",
+    "luật công chứng": "notary_law_2024",
+    "nghị quyết 01/2024": "marriage_family_resolution_2024",
+    "nq 01/2024": "marriage_family_resolution_2024",
+    "nhà ở xã hội": "social_housing_decrees_2024",
+    "noxh": "social_housing_decrees_2024",
+    "nghị định 100/2024": "social_housing_decrees_2024",
+    "nghị định 88/2024": "social_housing_decrees_2024",
 }
 
 # Bản đồ phát hiện Domain theo từ khóa chuyên môn
@@ -68,25 +82,28 @@ DOMAIN_KEYWORDS = {
     ],
     "marriage_family": [
         "ly hôn", "kết hôn", "nuôi con", "tài sản chung", "vợ chồng", "cấp dưỡng", 
-        "đơn phương ly hôn", "thuận tình", "con dưới 36 tháng", "chia tài sản", "hôn nhân"
+        "đơn phương ly hôn", "thuận tình", "con dưới 36 tháng", "chia tài sản", "hôn nhân",
+        "nghị quyết 01/2024", "vợ có thai", "chồng đòi ly hôn khi vợ mang thai", "mẹ nuôi con dưới 3 tuổi"
     ],
     "criminal": [
         "lừa đảo", "chiếm đoạt", "trộm cắp", "cố ý gây thương tích", "tội phạm", "ở tù", 
-        "hình sự", "cho vay lãi nặng", "tín dụng đen", "lạm dụng tín nhiệm", "hung khí", "thương tật"
+        "hình sự", "cho vay lãi nặng", "tín dụng đen", "lạm dụng tín nhiệm", "hung khí", "thương tật", "lãi 100%"
     ],
     "land": [
         "sổ đỏ", "chuyển nhượng đất", "bán đất", "thu hồi đất", "bồi thường đất", "đất đai", 
         "quyền sử dụng đất", "đất không có giấy tờ", "tranh chấp đất", "giải tỏa", "cọc 5%",
-        "kinh doanh bất động sản", "môi giới tự do", "bảng giá đất 2026", "bỏ khung giá đất", "bảng giá đất hàng năm"
+        "kinh doanh bất động sản", "môi giới tự do", "bảng giá đất 2026", "bỏ khung giá đất", "bảng giá đất hàng năm",
+        "nghị định 88/2024", "bồi thường bằng đất khác"
     ],
     "corporate": [
         "cổ phần", "cổ đông", "vốn góp", "công ty tnhh", "đại diện pháp luật", "doanh nghiệp", 
-        "chuyển nhượng vốn", "đại hội đồng cổ đông", "điều lệ công ty", "giám đốc"
+        "chuyển nhượng vốn", "đại hội đồng cổ đông", "điều lệ công ty", "giám đốc", "cổ đông 1%", "sở hữu chéo ngân hàng", "ép mua bảo hiểm"
     ],
     "civil": [
         "thừa kế", "di chúc", "đặt cọc", "phạt cọc", "vô hiệu", "hợp đồng thuê", "dân sự", 
         "chậm trả tiền", "lãi suất", "phạt vi phạm", "hàng thừa kế", "thời hiệu khởi kiện",
-        "thẻ căn cước", "cmnd hết hạn", "mống mắt", "vneid", "đổi căn cước", "khai tử cmnd", "01/01/2025"
+        "thẻ căn cước", "cmnd hết hạn", "mống mắt", "vneid", "đổi căn cước", "khai tử cmnd", "01/01/2025",
+        "công chứng điện tử", "luật công chứng", "cắt điện nước", "luật thủ đô"
     ],
     "procedure": [
         "tạm giữ", "tạm giam", "người bào chữa", "luật sư bào chữa", "khởi tố", "chứng cứ", 
@@ -96,7 +113,7 @@ DOMAIN_KEYWORDS = {
         "thương mại", "phạt vi phạm 8%", "miễn trách nhiệm", "bất khả kháng"
     ],
     "housing": [
-        "nhà ở", "thuê nhà ở", "chấm dứt thuê nhà", "đòi nhà"
+        "nhà ở", "thuê nhà ở", "chấm dứt thuê nhà", "đòi nhà", "nhà ở xã hội", "noxh", "nghị định 100/2024", "thu nhập mua noxh", "bỏ hộ khẩu mua noxh"
     ],
     "traffic": [
         "nồng độ cồn", "thổi cồn", "tốc độ", "chạy quá tốc độ", "vượt đèn đỏ", "tước bằng lái", 
@@ -109,10 +126,10 @@ DOMAIN_KEYWORDS = {
     ],
     "tax": [
         "thuế", "thu nhập cá nhân", "thuế tncn", "giảm trừ gia cảnh", "người phụ thuộc", 
-        "lũy tiến", "thuế bán đất", "thuế chuyển nhượng", "lệ phí trước bạ", "miễn thuế bán nhà"
+        "lũy tiến", "thuế bán đất", "thuế chuyển nhượng", "lệ phí trước bạ", "miễn thuế bán nhà", "giảm trừ 15.5 triệu", "thuế gtgt 200 triệu"
     ],
     "precedents": [
-        "án lệ", "án lệ 02", "án lệ 25", "án lệ 04", "nhờ đứng tên", "tiền lệ", "tòa án nhân dân tối cao", "phán quyết án lệ"
+        "án lệ", "án lệ 02", "án lệ 25", "án lệ 04", "án lệ 69", "án lệ 71", "án lệ 72", "nhờ đứng tên", "tiền lệ", "tòa án nhân dân tối cao", "phán quyết án lệ", "nca", "nda", "thỏa thuận không cạnh tranh"
     ]
 }
 

@@ -28,14 +28,27 @@
   {
     "article_id": "thue_tncn_tien_luong_luy_tien",
     "law_id": "tax_property_laws",
-    "law_name": "Nghị quyết 954/2020/UBTVQH14 về Điều chỉnh mức giảm trừ gia cảnh thuế TNCN",
+    "law_name": "Luật Thuế Thu nhập cá nhân & Nghị quyết của Ủy ban Thường vụ Quốc hội",
     "domain": "tax",
-    "status": "HIỆU LỰC",
-    "article_number": "Điều 1",
-    "article_title": "Mức giảm trừ gia cảnh và biểu thuế lũy tiến từng phần",
-    "official_source": "https://vbpl.vn/TW/Pages/vbpq-toanvan.aspx?ItemID=142981",
-    "effective_date": "01/07/2020",
-    "keywords": ["giảm trừ gia cảnh 11 triệu", "người phụ thuộc 4.4 triệu", "thuế thu nhập cá nhân tiền lương", "biểu thuế lũy tiến", "tính thuế tncn"],
-    "content": "1. Mức giảm trừ gia cảnh quy định tại khoản 1 Điều 19 của Luật Thuế thu nhập cá nhân:\na) Mức giảm trừ đối với đối tượng nộp thuế là 11 triệu đồng/tháng (132 triệu đồng/năm);\nb) Mức giảm trừ đối với mỗi người phụ thuộc là 4,4 triệu đồng/tháng.\n2. Biểu thuế lũy tiến từng phần áp dụng đối với thu nhập tính thuế từ tiền lương, tiền công:\n- Bậc 1 (Đến 5 triệu đồng): 5%\n- Bậc 2 (Trên 5 đến 10 triệu đồng): 10%\n- Bậc 3 (Trên 10 đến 18 triệu đồng): 15%\n- Bậc 4 (Trên 18 đến 32 triệu đồng): 20%\n- Bậc 5 (Trên 32 đến 52 triệu đồng): 25%\n- Bậc 6 (Trên 52 đến 80 triệu đồng): 30%\n- Bậc 7 (Trên 80 triệu đồng): 35%"
+    "status": "HIỆU LỰC TỪ KỲ TÍNH THUẾ 2026",
+    "article_number": "Điều 19 (Cập nhật mức giảm trừ gia cảnh 2026)",
+    "article_title": "Mức giảm trừ gia cảnh thuế TNCN năm 2026 và biểu thuế lũy tiến từng phần",
+    "official_source": "https://vbpl.vn/TW/Pages/vbpq-toanvan.aspx?ItemID=32546",
+    "effective_date": "01/01/2026",
+    "keywords": ["giảm trừ gia cảnh 2026", "giảm trừ 15.5 triệu", "người phụ thuộc 6.2 triệu", "thuế thu nhập cá nhân 2026", "biểu thuế lũy tiến", "tính thuế tncn 2026"],
+    "content": "1. Mức giảm trừ gia cảnh áp dụng từ kỳ tính thuế năm 2026 (theo Nghị quyết mới của Ủy ban Thường vụ Quốc hội):\na) Mức giảm trừ đối với đối tượng nộp thuế: 15,5 triệu đồng/tháng (186 triệu đồng/năm) — tăng mạnh từ mức cũ 11 triệu đồng/tháng;\nb) Mức giảm trừ đối với mỗi người phụ thuộc: 6,2 triệu đồng/tháng — tăng từ mức cũ 4,4 triệu đồng/tháng.\n2. Biểu thuế lũy tiến từng phần áp dụng đối với thu nhập tính thuế từ tiền lương, tiền công sau khi đã trừ các khoản bảo hiểm bắt buộc và giảm trừ gia cảnh (thuế suất từ 5% đến 35%)."
+  },
+  {
+    "article_id": "thue_gtgt_2024_dieu_5",
+    "law_id": "tax_property_laws",
+    "law_name": "Luật Thuế Giá trị gia tăng 2024 (Luật số 48/2024/QH15)",
+    "domain": "tax",
+    "status": "HIỆU LỰC TỪ 01/07/2025 & 01/01/2026",
+    "article_number": "Điều 5 & Điều 9",
+    "article_title": "Nâng ngưỡng doanh thu miễn thuế hộ kinh doanh lên 200 triệu đồng/năm và thuế GTGT phân bón",
+    "official_source": "https://chinhphu.vn",
+    "effective_date": "01/07/2025",
+    "keywords": ["luật thuế gtgt 2024", "ngưỡng doanh thu 200 triệu", "hộ kinh doanh không chịu thuế gtgt", "thuế phân bón 5%", "chính sách thuế mới 2026"],
+    "content": "1. Ngưỡng doanh thu không chịu thuế của hộ, cá nhân kinh doanh: Nâng từ mức 100 triệu đồng/năm lên 200 triệu đồng/năm kể từ ngày 01/01/2026. Hộ kinh doanh có doanh thu hàng năm từ 200 triệu đồng trở xuống hoàn toàn không phải nộp thuế GTGT.\n2. Chuyển mặt hàng phân bón từ đối tượng 'không chịu thuế GTGT' sang đối tượng chịu thuế GTGT với thuế suất 5% kể từ ngày 01/07/2025 nhằm tháo gỡ khó khăn cho các doanh nghiệp sản xuất phân bón trong nước được khấu trừ thuế đầu vào."
   }
 ]
