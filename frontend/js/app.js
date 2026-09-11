@@ -162,6 +162,7 @@ function startApp() {
             const updateSendBtnVisual = () => {
                 const hasText = !!userInput.value.trim();
                 if (btnSend) {
+                    btnSend.disabled = !hasText;
                     if (hasText) {
                         btnSend.classList.remove('empty');
                     } else {
@@ -390,7 +391,7 @@ function startApp() {
         // Settings Modal
         btnOpenSettings.addEventListener('click', () => {
             inputApiKey.value = localStorage.getItem('ai_lawyer_api_key') || '';
-            if (selectModel) selectModel.value = localStorage.getItem('ai_lawyer_model') || 'gemini-2.5-flash';
+            if (selectModel) selectModel.value = localStorage.getItem('ai_lawyer_model') || 'gemini-3.5-flash-lite';
             settingsModal.classList.add('open');
         });
 
@@ -408,7 +409,7 @@ function startApp() {
 
         btnSaveSettings.addEventListener('click', () => {
             const key = inputApiKey.value.trim();
-            const model = selectModel ? selectModel.value : 'gemini-2.5-flash';
+            const model = selectModel ? selectModel.value : 'gemini-3.5-flash-lite';
             if (key) {
                 localStorage.setItem('ai_lawyer_api_key', key);
             } else {
@@ -609,7 +610,7 @@ function startApp() {
         const typingRow = showCourtTypingIndicator();
 
         const apiKey = localStorage.getItem('ai_lawyer_api_key');
-        const model = localStorage.getItem('ai_lawyer_model') || 'gemini-2.5-flash';
+        const model = localStorage.getItem('ai_lawyer_model') || 'gemini-3.5-flash-lite';
 
         try {
             const res = await fetch('/api/moot-court/turn', {
@@ -665,7 +666,7 @@ function startApp() {
         btnRequestVerdict.textContent = '⏳ Đang nghị án...';
 
         const apiKey = localStorage.getItem('ai_lawyer_api_key');
-        const model = localStorage.getItem('ai_lawyer_model') || 'gemini-2.5-flash';
+        const model = localStorage.getItem('ai_lawyer_model') || 'gemini-3.5-flash-lite';
 
         try {
             const res = await fetch('/api/moot-court/verdict', {
@@ -873,7 +874,7 @@ function startApp() {
         const apiKey = localStorage.getItem('ai_lawyer_api_key');
         if (apiKey) formData.append('api_key', apiKey);
 
-        const model = localStorage.getItem('ai_lawyer_model') || 'gemini-2.5-flash';
+        const model = localStorage.getItem('ai_lawyer_model') || 'gemini-3.5-flash-lite';
         formData.append('model', model);
 
         try {
@@ -1071,13 +1072,17 @@ function startApp() {
         welcomeScreen.style.display = 'none';
         appendMessage('user', text);
         userInput.value = '';
-        btnSend.disabled = true;
+        userInput.style.height = 'auto';
+        if (btnSend) {
+            btnSend.disabled = true;
+            btnSend.classList.add('empty');
+        }
 
         currentHistory.push({ role: 'user', content: text });
         const typingEl = showTypingIndicator();
 
         const apiKey = localStorage.getItem('ai_lawyer_api_key') || null;
-        const model = localStorage.getItem('ai_lawyer_model') || 'gemini-3.5-flash';
+        const model = localStorage.getItem('ai_lawyer_model') || 'gemini-3.5-flash-lite';
 
         try {
             const response = await fetch('/api/chat/stream', {
@@ -1092,7 +1097,7 @@ function startApp() {
                 })
             });
 
-            typingEl.remove();
+            if (typingEl && typingEl.parentNode) typingEl.remove();
 
             if (!response.ok) {
                 const errData = await response.json().catch(() => ({}));
@@ -1185,6 +1190,17 @@ function startApp() {
         } catch (error) {
             if (typingEl && typingEl.parentNode) typingEl.remove();
             appendMessage('assistant', `⚠️ **Lỗi kết nối tới máy chủ AI.** Vui lòng kiểm tra lại mạng hoặc thử lại.`);
+        } finally {
+            if (typingEl && typingEl.parentNode) typingEl.remove();
+            if (btnSend) {
+                btnSend.disabled = !userInput.value.trim();
+                if (!btnSend.disabled) {
+                    btnSend.classList.remove('empty');
+                } else {
+                    btnSend.classList.add('empty');
+                }
+            }
+            userInput.focus();
         }
     }
 
@@ -1446,7 +1462,10 @@ function startApp() {
     }
 
     function loadSavedSettings() {
-        // Model silently defaults to gemini-2.5-flash
+        const savedModel = localStorage.getItem('ai_lawyer_model');
+        if (!savedModel || savedModel.includes('2.5') || savedModel.includes('2.0') || savedModel === 'gemini-3.5-flash') {
+            localStorage.setItem('ai_lawyer_model', 'gemini-3.5-flash-lite');
+        }
     }
 
     function updateModelBadge(modelName) {
@@ -1815,7 +1834,7 @@ function startApp() {
 
         try {
             const apiKey = localStorage.getItem('ai_lawyer_api_key');
-            const model = localStorage.getItem('ai_lawyer_model') || 'gemini-2.5-flash';
+            const model = localStorage.getItem('ai_lawyer_model') || 'gemini-3.5-flash-lite';
 
             const res = await fetch('/api/negotiate/turn', {
                 method: 'POST',
@@ -1923,7 +1942,7 @@ function startApp() {
 
         try {
             const apiKey = localStorage.getItem('ai_lawyer_api_key');
-            const model = localStorage.getItem('ai_lawyer_model') || 'gemini-2.5-flash';
+            const model = localStorage.getItem('ai_lawyer_model') || 'gemini-3.5-flash-lite';
 
             const res = await fetch('/api/petitions/generate', {
                 method: 'POST',
@@ -2073,7 +2092,7 @@ function startApp() {
 
         try {
             const apiKey = localStorage.getItem('ai_lawyer_api_key');
-            const model = localStorage.getItem('ai_lawyer_model') || 'gemini-2.5-flash';
+            const model = localStorage.getItem('ai_lawyer_model') || 'gemini-3.5-flash-lite';
 
             const res = await fetch('/api/evidence/audit', {
                 method: 'POST',
@@ -2139,7 +2158,7 @@ function startApp() {
 
         try {
             const apiKey = localStorage.getItem('ai_lawyer_api_key');
-            const model = localStorage.getItem('ai_lawyer_model') || 'gemini-2.5-flash';
+            const model = localStorage.getItem('ai_lawyer_model') || 'gemini-3.5-flash-lite';
 
             const res = await fetch('/api/corporate/audit', {
                 method: 'POST',

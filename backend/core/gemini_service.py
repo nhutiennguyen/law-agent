@@ -68,22 +68,23 @@ class GeminiLegalService:
         return genai.Client(api_key=api_key)
 
     def _resolve_model(self, model_override: Optional[str] = None) -> str:
-        """Chuẩn hóa model name, tự động dùng model mới nhất nếu model cũ bị deprecated."""
+        """Chuẩn hóa model name, tự động dùng model mới nhất nếu model cũ bị deprecated hoặc nghẽn quota."""
         model = (model_override or "").strip()
-        if not model or "2.5" in model or "2.0" in model or "1.5" in model:
+        if not model or "2.5" in model or "2.0" in model or "1.5" in model or model in ["gemini-3.5-flash", "gemini-3.6-flash"]:
             return settings.DEFAULT_MODEL
         return model
 
     def _generate_with_fallback(self, client: genai.Client, primary_model: str, contents: Any, config: Any):
         """Gọi model với cơ chế tự động fallback nếu model gặp 503 high demand hoặc 429 quota."""
-        model_queue = [primary_model]
+        resolved_primary = self._resolve_model(primary_model)
+        model_queue = [resolved_primary]
         for m in [
-            "gemini-3.5-flash",
-            "gemini-flash-latest",
-            "gemini-3.6-flash",
-            "gemini-3.7-flash",
             "gemini-3.5-flash-lite",
-            "gemini-flash-lite-latest"
+            "gemini-3.1-flash-lite",
+            "gemini-3.8-flash",
+            "gemini-3.7-flash",
+            "gemini-3.6-flash",
+            "gemini-3.5-flash",
         ]:
             if m not in model_queue:
                 model_queue.append(m)
@@ -132,6 +133,17 @@ class GeminiLegalService:
         norm = ''.join([c for c in nfkd if not unicodedata.combining(c)]).replace('đ', 'd').replace('Đ', 'D').strip()
         cleaned = re.sub(r'[^\w\s]', '', norm).strip()
 
+        # 0. Loại trừ ngay nếu người dùng đang nói về người thân/bố trong gia đình:
+        # Ví dụ: "bố tôi bảo", "bố bảo tôi làm giấy tờ", "bố bảo chia đất", "bố mẹ bảo"
+        family_father_patterns = [
+            "bo toi", "bo em", "bo minh", "bo me", "ba me",
+            "bo bao toi", "bo bao em", "bo bao minh", "bo bao phai",
+            "bo bao chia", "bo bao lam", "bo bao ky", "bo bao di",
+            "bo bao ban", "bo bao mua", "bo dan", "bo keu"
+        ]
+        if any(p in norm for p in family_father_patterns):
+            return False
+
         # 1. Chào hỏi thông thường
         greetings = [
             "chao", "hello", "hi", "alo", "e", "ban oi", "hi ban", "hey",
@@ -140,20 +152,25 @@ class GeminiLegalService:
         if cleaned in greetings or any(cleaned == g for g in greetings):
             return True
 
-        # 2. Đề cập trực tiếp tới Bố Bảo hoặc Huỳnh Nguyên Khang
-        if "bo bao" in norm or "huynh nguyen khang" in norm:
-            return True
-
-        # 3. Hỏi về người sáng lập / tác giả / nguồn gốc
-        creator_words = [
-            "sang lap", "tao ra", "lam ra", "viet ra", "sinh ra", "phat trien",
-            "cha de", "ong chu", "tac gia", "lap trinh", "day ban", "code ra"
+        # 2. Hỏi trực tiếp về người sáng lập / tác giả / nguồn gốc
+        creator_questions = [
+            "bo bao la ai", "ai la bo bao", "ai tao ra", "ai sang lap",
+            "ai lam ra", "ai phat trien", "nguoi sang lap", "cha de", "ong chu",
+            "tac gia la ai", "ai lap trinh", "ai code ra", "nguon goc cua ban"
         ]
-        if any(w in norm for w in creator_words) and any(w in norm for w in ["ai", "nguoi", "ban", "bot", "sao"]):
+        if any(p in norm for p in creator_questions):
             return True
 
-        # 4. Hỏi về danh tính / bạn là ai / bạn tên gì
-        if any(p in norm for p in ["ban la ai", "ten gi", "ban ten", "may la ai", "bot la ai"]):
+        # 3. Hỏi về danh tính / bạn là ai / bạn tên gì
+        if any(p in norm for p in ["ban la ai", "ten gi", "ban ten", "may la ai", "bot la ai", "huynh nguyen khang la ai"]):
+            return True
+
+        # 4. Thắc mắc / hỏi lại ngắn: "là sao", "sao vậy", "nghĩa là gì", "ý bạn là gì"
+        clarifications = [
+            "la sao", "sao the", "sao vay", "nghia la sao", "nghia la gi",
+            "y la sao", "y ban la gi", "y cua ban", "tai sao", "the la sao", "the nao"
+        ]
+        if cleaned in clarifications or any(cleaned == c for c in clarifications):
             return True
 
         # 5. Hỏi về khả năng / bạn làm được gì
@@ -233,10 +250,10 @@ class GeminiLegalService:
                 )
         else:
             rag_context_prompt = (
-                "\n[CHỈ DẪN QUAN TRỌNG]: Người dùng đang chào hỏi hoặc hỏi về danh tính / người sáng lập của bạn. "
-                "Hãy trả lời thật tự nhiên, thông minh, lịch sự, thân thiện và ấm áp. "
-                "Khẳng định rõ bạn là 'Huỳnh Nguyên Khang' — trợ lý cố vấn pháp lý AI được sáng lập và phát triển bởi 'Bố Bảo'. "
-                "TUYỆT ĐỐI KHÔNG trích dẫn điều luật hay phân tích cấu trúc hành chính vào câu trả lời này.\n"
+                "\n[CHỈ DẪN GIAO TIẾP]: Người dùng đang giao tiếp tự nhiên, chào hỏi, hoặc thắc mắc làm rõ ý. "
+                "Hãy trả lời thật tự nhiên, điềm đạm, khiêm tốn, lịch sự và đúng trọng tâm. "
+                "TUYỆT ĐỐI KHÔNG tự động nói dông dài ca ngợi người sáng lập (chỉ giới thiệu ngắn gọn 1 câu nếu người dùng hỏi trực tiếp 'Bố Bảo là ai' hoặc 'Ai tạo ra bạn'). "
+                "Nếu người dùng nói 'là sao' hoặc thắc mắc, hãy giải thích ngắn gọn, rõ ràng xem họ đang muốn làm rõ vấn đề gì.\n"
             )
 
         contents = []
@@ -350,10 +367,10 @@ class GeminiLegalService:
                 )
         else:
             rag_context_prompt = (
-                "\n[CHỈ DẪN QUAN TRỌNG]: Người dùng đang chào hỏi hoặc hỏi về danh tính / người sáng lập của bạn. "
-                "Hãy trả lời thật tự nhiên, thông minh, lịch sự, thân thiện và ấm áp. "
-                "Khẳng định rõ bạn là 'Huỳnh Nguyên Khang' — trợ lý cố vấn pháp lý AI được sáng lập và phát triển bởi 'Bố Bảo'. "
-                "TUYỆT ĐỐI KHÔNG trích dẫn điều luật hay phân tích cấu trúc hành chính vào câu trả lời này.\n"
+                "\n[CHỈ DẪN GIAO TIẾP]: Người dùng đang giao tiếp tự nhiên, chào hỏi, hoặc thắc mắc làm rõ ý. "
+                "Hãy trả lời thật tự nhiên, điềm đạm, khiêm tốn, lịch sự và đúng trọng tâm. "
+                "TUYỆT ĐỐI KHÔNG tự động nói dông dài ca ngợi người sáng lập (chỉ giới thiệu ngắn gọn 1 câu nếu người dùng hỏi trực tiếp 'Bố Bảo là ai' hoặc 'Ai tạo ra bạn'). "
+                "Nếu người dùng nói 'là sao' hoặc thắc mắc, hãy giải thích ngắn gọn, rõ ràng xem họ đang muốn làm rõ vấn đề gì.\n"
             )
 
         citations_list = [
@@ -399,16 +416,17 @@ class GeminiLegalService:
         )
 
         model_queue = [
-            "gemini-3.5-flash",
-            "gemini-flash-latest",
-            "gemini-3.6-flash",
-            "gemini-3.7-flash",
             "gemini-3.5-flash-lite",
-            "gemini-flash-lite-latest"
+            "gemini-3.1-flash-lite",
+            "gemini-3.8-flash",
+            "gemini-3.7-flash",
+            "gemini-3.6-flash",
+            "gemini-3.5-flash",
         ]
-        if model_override and model_override.strip() in model_queue:
-            model_queue.remove(model_override.strip())
-            model_queue.insert(0, model_override.strip())
+        resolved = self._resolve_model(model_override)
+        if resolved and resolved in model_queue:
+            model_queue.remove(resolved)
+            model_queue.insert(0, resolved)
 
         stream_success = False
         full_reply_text = ""
