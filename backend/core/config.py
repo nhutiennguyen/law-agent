@@ -19,7 +19,8 @@ class Settings:
     
     # Khóa bí mật & Cấu hình Gemini
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    DEFAULT_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+    _raw_model: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
+    DEFAULT_MODEL: str = "gemini-3.5-flash-lite" if (_raw_model in ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash"] or not _raw_model) else _raw_model
     
     # Server host & port
     HOST: str = os.getenv("HOST", "127.0.0.1")

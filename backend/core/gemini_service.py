@@ -71,7 +71,7 @@ class GeminiLegalService:
         """Chuẩn hóa model name, tự động dùng model mới nhất nếu model cũ bị deprecated hoặc nghẽn quota."""
         model = (model_override or "").strip()
         if not model or "2.5" in model or "2.0" in model or "1.5" in model or model in ["gemini-3.5-flash", "gemini-3.6-flash"]:
-            return settings.DEFAULT_MODEL
+            return "gemini-3.5-flash-lite"
         return model
 
     def _generate_with_fallback(self, client: genai.Client, primary_model: str, contents: Any, config: Any):
