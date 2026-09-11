@@ -87,6 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCopyVerdict = document.getElementById('btn-copy-verdict');
     const btnReplayCourt = document.getElementById('btn-replay-court');
     const btnExportVerdictDocx = document.getElementById('btn-export-verdict-docx');
+    const btnNegVoice = document.getElementById('btn-neg-voice');
 
     // --- DOM Elements: Settings Modal ---
     const btnOpenSettings = document.getElementById('btn-open-settings');
@@ -173,7 +174,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Voice inputs
         initSpeechRecognition(btnVoiceInput, userInput);
-        initSpeechRecognition(btnNegVoice, document.getElementById('neg-user-input'));
+        if (btnNegVoice) {
+            initSpeechRecognition(btnNegVoice, document.getElementById('neg-user-input'));
+        }
 
         // Negotiation Arena Events
         const btnStartNeg = document.getElementById('btn-start-negotiate');
@@ -461,11 +464,14 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch('/api/moot-court/presets');
             if (res.ok) {
-                courtPresets = await res.json();
-                renderCourtPresets();
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    courtPresets = data;
+                    renderCourtPresets();
+                }
             }
         } catch (e) {
-            console.warn('Lỗi lấy preset án tòa');
+            console.warn('Lỗi lấy preset án tòa:', e);
         }
     }
 
@@ -957,8 +963,16 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchCategories() {
         try {
             const res = await fetch('/api/categories');
-            if (res.ok) categories = await res.json();
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data) && data.length > 0) {
+                    categories = data;
+                }
+            }
         } catch (e) {
+            console.warn('Lỗi tải danh mục:', e);
+        }
+        if (!Array.isArray(categories) || categories.length === 0) {
             categories = [{ id: 'all', name: 'Tư vấn Tổng hợp', icon: '⚖️', sample_questions: [] }];
         }
         renderCategories();
@@ -1582,8 +1596,11 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch('/api/negotiate/presets');
             if (res.ok) {
-                negotiatePresets = await res.json();
-                renderNegotiatePresets();
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    negotiatePresets = data;
+                    renderNegotiatePresets();
+                }
             }
         } catch (e) {
             console.warn('Lỗi lấy kịch bản đàm phán:', e);
