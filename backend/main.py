@@ -13,7 +13,7 @@ app = FastAPI(
     version=settings.VERSION
 )
 
-# Cấu hình Security Headers chống clickjacking, MIME-sniffing, XSS
+# Cấu hình Security Headers & Cache-Busting để client luôn nhận bản mới nhất
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
@@ -21,6 +21,13 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    
+    # Ngăn chặn trình duyệt lưu cache cũ của trang chủ và file script
+    req_path = request.url.path
+    if req_path in ["/", "/index.html"] or req_path.endswith(".js") or req_path.endswith(".css"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
     return response
 
 # Cấu hình CORS để frontend giao tiếp thông suốt

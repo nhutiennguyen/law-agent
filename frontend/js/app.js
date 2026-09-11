@@ -6,7 +6,7 @@
  * 3. Phiên Tòa Giả Lập & Đối Chất Tranh Tụng (AI Moot Court)
  */
 
-document.addEventListener('DOMContentLoaded', () => {
+function startApp() {
     // --- DOM Elements: Navigation & Modes ---
     const sidebar = document.getElementById('sidebar');
     const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
@@ -155,96 +155,146 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function bindEvents() {
-        // Toggle Sidebar
-        btnToggleSidebar.addEventListener('click', () => {
-            sidebar.classList.toggle('collapsed');
-        });
+        // =====================================================================
+        // 1. CHAT COMPOSER & GỬI TIN NHẮN (ƯU TIÊN HÀNG ĐẦU - TUYỆT ĐỐI KHÔNG LỖI)
+        // =====================================================================
+        if (userInput) {
+            const updateSendBtnVisual = () => {
+                const hasText = !!userInput.value.trim();
+                if (btnSend) {
+                    if (hasText) {
+                        btnSend.classList.remove('empty');
+                    } else {
+                        btnSend.classList.add('empty');
+                    }
+                }
+            };
 
-        // 6 Navigation Modes
-        modeChatBtn.addEventListener('click', () => switchMode('chat'));
-        modeReviewBtn.addEventListener('click', () => switchMode('review'));
-        modeCourtBtn.addEventListener('click', () => switchMode('court'));
+            userInput.addEventListener('input', () => {
+                userInput.style.height = 'auto';
+                userInput.style.height = Math.min(userInput.scrollHeight, 160) + 'px';
+                updateSendBtnVisual();
+            });
+
+            userInput.addEventListener('change', updateSendBtnVisual);
+            userInput.addEventListener('keyup', updateSendBtnVisual);
+            userInput.addEventListener('paste', () => setTimeout(updateSendBtnVisual, 50));
+
+            userInput.addEventListener('keydown', (e) => {
+                const isEnter = (e.key === 'Enter' || e.keyCode === 13 || e.which === 13);
+                if (isEnter && !e.shiftKey) {
+                    // Không gửi khi đang gõ bộ gõ tiếng Việt (Unikey / EVKey / GBoard)
+                    if (e.isComposing || e.keyCode === 229) {
+                        return;
+                    }
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+        }
+
+        if (btnSend) {
+            btnSend.addEventListener('click', (e) => {
+                e.preventDefault();
+                sendMessage();
+            });
+        }
+
+        if (btnChatAttach && chatFileInput) {
+            btnChatAttach.addEventListener('click', () => chatFileInput.click());
+            chatFileInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    const file = e.target.files[0];
+                    switchMode('review');
+                    setContractFile(file);
+                }
+            });
+        }
+
+        if (btnNewChat) {
+            btnNewChat.addEventListener('click', handleNewSession);
+        }
+
+        // =====================================================================
+        // 2. THANH ĐIỀU HƯỚNG & 6 CHẾ ĐỘ (NAVIGATION MODES)
+        // =====================================================================
+        if (btnToggleSidebar && sidebar) {
+            btnToggleSidebar.addEventListener('click', () => {
+                sidebar.classList.toggle('collapsed');
+            });
+        }
+
+        if (modeChatBtn) modeChatBtn.addEventListener('click', () => switchMode('chat'));
+        if (modeReviewBtn) modeReviewBtn.addEventListener('click', () => switchMode('review'));
+        if (modeCourtBtn) modeCourtBtn.addEventListener('click', () => switchMode('court'));
         if (modeNegotiateBtn) modeNegotiateBtn.addEventListener('click', () => switchMode('negotiate'));
         if (modePetitionBtn) modePetitionBtn.addEventListener('click', () => switchMode('petition'));
         if (modeAuditorBtn) modeAuditorBtn.addEventListener('click', () => switchMode('auditor'));
 
-        if (btnExportVerdictDocx) {
-            btnExportVerdictDocx.addEventListener('click', downloadCourtVerdictDocx);
-        }
-
-        // Voice inputs
-        initSpeechRecognition(btnVoiceInput, userInput);
-        if (btnNegVoice) {
-            initSpeechRecognition(btnNegVoice, document.getElementById('neg-user-input'));
-        }
-
-        // Negotiation Arena Events
-        const btnStartNeg = document.getElementById('btn-start-negotiate');
-        if (btnStartNeg) btnStartNeg.addEventListener('click', startNegotiationSession);
-
-        const btnExitNeg = document.getElementById('btn-exit-negotiate');
-        if (btnExitNeg) {
-            btnExitNeg.addEventListener('click', () => {
-                document.getElementById('negotiate-setup-card').style.display = 'block';
-                document.getElementById('negotiate-arena').style.display = 'none';
-            });
-        }
-
-        const btnNegSend = document.getElementById('btn-neg-send');
-        if (btnNegSend) btnNegSend.addEventListener('click', sendNegotiateTurn);
-
-        const negInput = document.getElementById('neg-user-input');
-        if (negInput) {
-            negInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendNegotiateTurn();
-                }
-            });
-        }
-
-        const recChip = document.getElementById('neg-recommended-chip');
-        if (recChip) {
-            recChip.addEventListener('click', () => {
-                if (lastRecommendedCounter && negInput) {
-                    negInput.value = lastRecommendedCounter;
-                    negInput.focus();
-                }
-            });
-        }
-
-        // Initialize sub-modules
-        initCalculatorModal();
-        initPetitionGenerator();
-        initAuditor();
-
-        // New Session Button
-        btnNewChat.addEventListener('click', handleNewSession);
-
-        // Chat Composer Input
-        userInput.addEventListener('input', () => {
-            userInput.style.height = 'auto';
-            userInput.style.height = Math.min(userInput.scrollHeight, 160) + 'px';
-            btnSend.disabled = !userInput.value.trim();
-        });
-
-        userInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                if (!btnSend.disabled) sendMessage();
+        // =====================================================================
+        // 3. CÁC TÍNH NĂNG VÀ SUB-MODULE MỞ RỘNG (AN TOÀN CÁCH LY)
+        // =====================================================================
+        try {
+            if (btnExportVerdictDocx) {
+                btnExportVerdictDocx.addEventListener('click', downloadCourtVerdictDocx);
             }
-        });
-
-        btnSend.addEventListener('click', sendMessage);
-
-        btnChatAttach.addEventListener('click', () => chatFileInput.click());
-        chatFileInput.addEventListener('change', (e) => {
-            if (e.target.files && e.target.files[0]) {
-                const file = e.target.files[0];
-                switchMode('review');
-                setContractFile(file);
+            if (btnVoiceInput) {
+                initSpeechRecognition(btnVoiceInput, userInput);
             }
-        });
+            if (btnNegVoice) {
+                initSpeechRecognition(btnNegVoice, document.getElementById('neg-user-input'));
+            }
+        } catch (e) {
+            console.warn('Lỗi gắn listener Voice/Docx:', e);
+        }
+
+        try {
+            const btnStartNeg = document.getElementById('btn-start-negotiate');
+            if (btnStartNeg) btnStartNeg.addEventListener('click', startNegotiationSession);
+
+            const btnExitNeg = document.getElementById('btn-exit-negotiate');
+            if (btnExitNeg) {
+                btnExitNeg.addEventListener('click', () => {
+                    document.getElementById('negotiate-setup-card').style.display = 'block';
+                    document.getElementById('negotiate-arena').style.display = 'none';
+                });
+            }
+
+            const btnNegSend = document.getElementById('btn-neg-send');
+            if (btnNegSend) btnNegSend.addEventListener('click', sendNegotiateTurn);
+
+            const negInput = document.getElementById('neg-user-input');
+            if (negInput) {
+                negInput.addEventListener('keydown', (e) => {
+                    const isEnter = (e.key === 'Enter' || e.keyCode === 13 || e.which === 13);
+                    if (isEnter && !e.shiftKey) {
+                        if (e.isComposing || e.keyCode === 229) return;
+                        e.preventDefault();
+                        sendNegotiateTurn();
+                    }
+                });
+            }
+
+            const recChip = document.getElementById('neg-recommended-chip');
+            if (recChip) {
+                recChip.addEventListener('click', () => {
+                    if (lastRecommendedCounter && negInput) {
+                        negInput.value = lastRecommendedCounter;
+                        negInput.focus();
+                    }
+                });
+            }
+        } catch (e) {
+            console.warn('Lỗi gắn listener Negotiation:', e);
+        }
+
+        try {
+            initCalculatorModal();
+            initPetitionGenerator();
+            initAuditor();
+        } catch (e) {
+            console.warn('Lỗi khởi tạo sub-modules:', e);
+        }
 
         // Contract Review Drag & Drop
         contractDropzone.addEventListener('dragover', (e) => {
@@ -642,7 +692,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const data = await res.json();
             lastVerdictMarkdown = data.verdict_markdown;
-            verdictContent.innerHTML = marked.parse(data.verdict_markdown);
+            verdictContent.innerHTML = safeMarkdown(data.verdict_markdown);
 
             courtArena.style.display = 'none';
             courtVerdictCard.style.display = 'block';
@@ -728,7 +778,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         bubble.innerHTML = `
             <div class="court-bubble-speaker">${speakerIcon} ${speakerName}</div>
-            <div class="court-bubble-text">${marked.parse(text)}</div>
+            <div class="court-bubble-text">${safeMarkdown(text)}</div>
             ${tipHtml}
         `;
 
@@ -847,7 +897,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             resultDocName.textContent = `Báo Cáo Thẩm Định: ${data.filename || 'Dự thảo Hợp đồng'}`;
             if (resultModelBadge) resultModelBadge.textContent = '⚖️ Thẩm định hoàn tất';
-            resultContent.innerHTML = marked.parse(data.review_result);
+            resultContent.innerHTML = safeMarkdown(data.review_result);
             reviewResultCard.style.display = 'block';
             reviewResultCard.scrollIntoView({ behavior: 'smooth' });
 
@@ -1102,13 +1152,13 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                         } else if (evt.type === 'token') {
                             accumulatedText += evt.token;
-                            textContainer.innerHTML = marked.parse(accumulatedText);
+                            textContainer.innerHTML = safeMarkdown(accumulatedText);
                             chatContainer.scrollTop = chatContainer.scrollHeight;
                         } else if (evt.type === 'follow_ups') {
                             streamFollowUps = evt.follow_ups || [];
                         } else if (evt.type === 'error') {
                             accumulatedText += `\n\n⚠️ **Lỗi:** ${evt.error}`;
-                            textContainer.innerHTML = marked.parse(accumulatedText);
+                            textContainer.innerHTML = safeMarkdown(accumulatedText);
                         }
                     } catch (pe) {
                         console.error('Error parsing SSE event:', pe);
@@ -1148,7 +1198,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const bubble = document.createElement('div');
         bubble.className = 'message-bubble';
-        bubble.innerHTML = role === 'assistant' ? marked.parse(content) : escapeHtml(content);
+        bubble.innerHTML = role === 'assistant' ? safeMarkdown(content) : escapeHtml(content);
 
         // 1. Render RAG Official Law Citations
         if (role === 'assistant' && citations && citations.length > 0) {
@@ -1408,62 +1458,65 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =========================================================================
-    // WEB SPEECH-TO-TEXT VOICE INPUT
+    // WEB SPEECH-TO-TEXT VOICE INPUT (KHỞI TẠO LAZY AN TOÀN KHI CLICK)
     // =========================================================================
     function initSpeechRecognition(buttonEl, targetInputEl) {
         if (!buttonEl || !targetInputEl) return;
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            buttonEl.title = 'Trình duyệt không hỗ trợ Web Speech API (Dùng Chrome/Edge)';
-            buttonEl.addEventListener('click', () => {
-                alert('Trình duyệt hiện tại không hỗ trợ Web Speech API. Bạn vui lòng sử dụng Google Chrome hoặc Microsoft Edge để nhập liệu bằng giọng nói.');
-            });
-            return;
-        }
-
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'vi-VN';
-        recognition.continuous = false;
-        recognition.interimResults = false;
-
+        
+        let recognition = null;
         let isRecording = false;
 
-        recognition.onstart = () => {
-            isRecording = true;
-            buttonEl.classList.add('recording');
-            buttonEl.title = 'Đang lắng nghe tiếng Việt... Bạn hãy nói';
-        };
-
-        recognition.onresult = (event) => {
-            const transcript = event.results[0][0].transcript;
-            if (transcript) {
-                targetInputEl.value = (targetInputEl.value ? targetInputEl.value + ' ' : '') + transcript;
-                targetInputEl.dispatchEvent(new Event('input'));
-                targetInputEl.focus();
-            }
-        };
-
-        recognition.onerror = (event) => {
-            console.warn('Lỗi nhận diện giọng nói:', event.error);
-            isRecording = false;
-            buttonEl.classList.remove('recording');
-        };
-
-        recognition.onend = () => {
-            isRecording = false;
-            buttonEl.classList.remove('recording');
-            buttonEl.title = 'Nhập liệu bằng giọng nói Tiếng Việt (Microphone)';
-        };
-
-        buttonEl.addEventListener('click', () => {
-            if (isRecording) {
-                recognition.stop();
-            } else {
-                try {
-                    recognition.start();
-                } catch (err) {
-                    console.warn(err);
+        buttonEl.addEventListener('click', (e) => {
+            e.preventDefault();
+            try {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) {
+                    alert('Trình duyệt hiện tại không hỗ trợ Web Speech API. Bạn vui lòng sử dụng Google Chrome hoặc Microsoft Edge để nhập liệu bằng giọng nói.');
+                    return;
                 }
+
+                if (!recognition) {
+                    recognition = new SpeechRecognition();
+                    recognition.lang = 'vi-VN';
+                    recognition.continuous = false;
+                    recognition.interimResults = false;
+
+                    recognition.onstart = () => {
+                        isRecording = true;
+                        buttonEl.classList.add('recording');
+                        buttonEl.title = 'Đang lắng nghe tiếng Việt... Bạn hãy nói';
+                    };
+
+                    recognition.onresult = (event) => {
+                        const transcript = event.results && event.results[0] && event.results[0][0] ? event.results[0][0].transcript : '';
+                        if (transcript) {
+                            targetInputEl.value = (targetInputEl.value ? targetInputEl.value + ' ' : '') + transcript;
+                            targetInputEl.dispatchEvent(new Event('input'));
+                            targetInputEl.focus();
+                        }
+                    };
+
+                    recognition.onerror = (event) => {
+                        console.warn('Lỗi nhận diện giọng nói:', event.error);
+                        isRecording = false;
+                        buttonEl.classList.remove('recording');
+                    };
+
+                    recognition.onend = () => {
+                        isRecording = false;
+                        buttonEl.classList.remove('recording');
+                        buttonEl.title = 'Nhập liệu bằng giọng nói Tiếng Việt (Microphone)';
+                    };
+                }
+
+                if (isRecording) {
+                    recognition.stop();
+                } else {
+                    recognition.start();
+                }
+            } catch (err) {
+                console.warn('Lỗi kích hoạt SpeechRecognition:', err);
+                alert('Không thể kích hoạt microphone: ' + (err.message || 'Lỗi thiết bị'));
             }
         });
     }
@@ -1717,14 +1770,14 @@ document.addEventListener('DOMContentLoaded', () => {
             tacticalHtml = `
                 <div class="court-tip-box" style="margin-top: 10px; border-left-color: #D4AF37;">
                     <div style="font-weight:700; color: #D4AF37; margin-bottom: 4px;">⚖️ CỐ VẤN CHIẾN THUẬT HUỲNH NGUYÊN KHANG NHẬN XÉT:</div>
-                    ${marked.parse(tacticalData)}
+                    ${safeMarkdown(tacticalData)}
                 </div>
             `;
         }
 
         bubble.innerHTML = `
             <div class="court-bubble-speaker">${icon} ${speakerName}</div>
-            <div class="court-bubble-text">${marked.parse(text)}</div>
+            <div class="court-bubble-text">${safeMarkdown(text)}</div>
             ${tacticalHtml}
         `;
 
@@ -1899,7 +1952,7 @@ document.addEventListener('DOMContentLoaded', () => {
             lastPetitionTitle = data.petition_title;
 
             document.getElementById('pet-result-title').textContent = data.petition_title;
-            document.getElementById('pet-result-content').innerHTML = marked.parse(data.content_markdown);
+            document.getElementById('pet-result-content').innerHTML = safeMarkdown(data.content_markdown);
 
             resultCard.style.display = 'block';
             resultCard.scrollIntoView({ behavior: 'smooth' });
@@ -2055,7 +2108,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 tbody.appendChild(tr);
             });
 
-            document.getElementById('ev-general-recommendations').innerHTML = marked.parse(data.general_recommendations);
+            document.getElementById('ev-general-recommendations').innerHTML = safeMarkdown(data.general_recommendations);
             resultCard.style.display = 'block';
             resultCard.scrollIntoView({ behavior: 'smooth' });
 
@@ -2187,9 +2240,33 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function safeMarkdown(text) {
+        if (!text) return '';
+        if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
+            try {
+                return marked.parse(text);
+            } catch (e) {
+                console.warn('Lỗi phân tích Markdown:', e);
+            }
+        }
+        return escapeHtml(text)
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            .replace(/\n/g, '<br>');
+    }
+
     function escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     }
-});
+}
+
+// Khởi động an toàn: Chạy ngay nếu DOM đã sẵn sàng hoặc lắng nghe DOMContentLoaded
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startApp);
+} else {
+    startApp();
+}
+
