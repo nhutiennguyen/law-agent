@@ -92,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- DOM Elements: Settings Modal ---
     const btnOpenSettings = document.getElementById('btn-open-settings');
     const settingsModal = document.getElementById('settings-modal');
-    const btnCloseModal = document.getElementById('btn-close-modal');
+    const btnCloseModal = document.getElementById('btn-close-settings') || document.getElementById('btn-close-modal');
     const inputApiKey = document.getElementById('input-api-key');
     const btnTogglePwd = document.getElementById('btn-toggle-pwd');
     const selectModel = document.getElementById('select-model');
@@ -344,7 +344,9 @@ document.addEventListener('DOMContentLoaded', () => {
             settingsModal.classList.add('open');
         });
 
-        btnCloseModal.addEventListener('click', () => settingsModal.classList.remove('open'));
+        if (btnCloseModal) {
+            btnCloseModal.addEventListener('click', () => settingsModal.classList.remove('open'));
+        }
         settingsModal.addEventListener('click', (e) => {
             if (e.target === settingsModal) settingsModal.classList.remove('open');
         });
@@ -1582,7 +1584,33 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await res.json();
             titleEl.textContent = data.title;
             summaryEl.innerHTML = `<strong>${data.summary_text}</strong>`;
-            legalEl.innerHTML = `⚖️ <em>Căn cứ pháp lý: ${data.legal_basis}</em>`;
+            const detailsEl = document.getElementById('calc-result-details');
+            if (detailsEl && data.result_details) {
+                let detailsHtml = '<div style="margin-top: 10px; font-size: 13px; border-top: 1px dashed rgba(212,175,55,0.3); padding-top: 8px; display: flex; flex-direction: column; gap: 4px;">';
+                if (data.result_details.court_fee !== undefined) {
+                    detailsHtml += `<div>• Án phí sơ thẩm: <strong>${data.result_details.court_fee.toLocaleString('vi-VN')} VNĐ</strong></div>`;
+                    detailsHtml += `<div>• Tạm ứng án phí nộp trước (50%): <strong style="color: #38BDF8;">${data.result_details.advance_fee.toLocaleString('vi-VN')} VNĐ</strong></div>`;
+                }
+                if (data.result_details.interest_amount !== undefined) {
+                    detailsHtml += `<div>• Nợ gốc: <strong>${(data.result_details.principal || 0).toLocaleString('vi-VN')} VNĐ</strong></div>`;
+                    detailsHtml += `<div>• Lãi phát sinh: <strong style="color: #F87171;">${data.result_details.interest_amount.toLocaleString('vi-VN')} VNĐ</strong> (${data.result_details.days_overdue} ngày)</div>`;
+                    detailsHtml += `<div>• Tổng số tiền phải trả: <strong style="color: #4ADE80;">${(data.result_details.total_due || 0).toLocaleString('vi-VN')} VNĐ</strong></div>`;
+                }
+                if (data.result_details.total_tax !== undefined) {
+                    if (data.result_details.is_first_home_exempt) {
+                        detailsHtml += `<div style="color: #4ADE80;">• Miễn thuế TNCN 2% (nhà ở duy nhất)</div>`;
+                    } else if (data.result_details.tax_tncn !== undefined) {
+                        detailsHtml += `<div>• Thuế TNCN (2%): <strong>${data.result_details.tax_tncn.toLocaleString('vi-VN')} VNĐ</strong></div>`;
+                    }
+                    detailsHtml += `<div>• Lệ phí trước bạ (0.5%): <strong>${(data.result_details.fee_truoc_ba || 0).toLocaleString('vi-VN')} VNĐ</strong></div>`;
+                    detailsHtml += `<div>• Tổng nghĩa vụ tài chính: <strong style="color: #F87171;">${(data.result_details.total_tax || 0).toLocaleString('vi-VN')} VNĐ</strong></div>`;
+                }
+                if (data.result_details.allowance_amount !== undefined) {
+                    detailsHtml += `<div>• Tiền trợ cấp thôi việc: <strong style="color: #4ADE80;">${data.result_details.allowance_amount.toLocaleString('vi-VN')} VNĐ</strong></div>`;
+                }
+                detailsHtml += '</div>';
+                detailsEl.innerHTML = detailsHtml;
+            }
         } catch (e) {
             summaryEl.textContent = '⚠️ Đã xảy ra lỗi khi tính toán. Vui lòng kiểm tra lại số liệu nhập.';
         }

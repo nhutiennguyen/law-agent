@@ -99,6 +99,32 @@ class GeminiLegalService:
                 last_error = e
         raise last_error
 
+    @staticmethod
+    def _extract_json_dict(text: str) -> Dict[str, Any]:
+        """Trích xuất và parse an toàn JSON dictionary từ phản hồi LLM."""
+        raw = (text or "").strip()
+        try:
+            return json.loads(raw)
+        except Exception:
+            pass
+
+        m = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", raw)
+        if m:
+            try:
+                return json.loads(m.group(1))
+            except Exception:
+                pass
+
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            try:
+                return json.loads(raw[start:end+1])
+            except Exception:
+                pass
+
+        raise ValueError(f"Không thể trích xuất JSON hợp lệ từ phản hồi AI: {raw[:150]}")
+
     def _is_conversational_or_meta_query(self, message: str) -> bool:
         """Nhận diện các câu hỏi chào hỏi, hỏi danh tính, hỏi người sáng lập để không kích hoạt RAG luật máy móc."""
         # Chuẩn hóa loại bỏ toàn bộ dấu tiếng Việt để so khớp không bao giờ trượt
@@ -810,16 +836,7 @@ class GeminiLegalService:
                 contents=contents,
                 config=config,
             )
-            raw = (response.text or "").strip()
-            if raw.startswith("```json"):
-                raw = raw[7:]
-            elif raw.startswith("```"):
-                raw = raw[3:]
-            if raw.endswith("```"):
-                raw = raw[:-3]
-            raw = raw.strip()
-
-            data = json.loads(raw)
+            data = self._extract_json_dict(response.text or "{}")
             items_list = [
                 EvidenceAuditItem(
                     item=it.get("item", "Chứng cứ"),
@@ -981,16 +998,7 @@ class GeminiLegalService:
                 contents=contents,
                 config=config,
             )
-            raw = (response.text or "").strip()
-            if raw.startswith("```json"):
-                raw = raw[7:]
-            elif raw.startswith("```"):
-                raw = raw[3:]
-            if raw.endswith("```"):
-                raw = raw[:-3]
-            raw = raw.strip()
-
-            data = json.loads(raw)
+            data = self._extract_json_dict(response.text or "{}")
             pillars_list = [
                 CorporatePillarAudit(
                     pillar_id=p.get("pillar_id", "pillar"),

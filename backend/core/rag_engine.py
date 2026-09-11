@@ -4,10 +4,18 @@
 import json
 import re
 import logging
+import unicodedata
 from pathlib import Path
 from typing import List, Dict, Optional, Set
 
 logger = logging.getLogger("ai_lawyer.rag")
+
+def remove_accents(text: str) -> str:
+    """Loại bỏ dấu tiếng Việt để tìm kiếm không dấu chuẩn xác."""
+    if not text:
+        return ""
+    nfkd = unicodedata.normalize('NFKD', text.lower())
+    return ''.join([c for c in nfkd if not unicodedata.combining(c)]).replace('đ', 'd').replace('Đ', 'D')
 
 # Bản đồ ánh xạ tên viết tắt chuyên ngành của giới Luật sư Việt Nam sang law_id
 LEGAL_ACRONYMS_MAP = {
@@ -165,20 +173,23 @@ class LegalRAGEngine:
 
     def detect_intent(self, query_lower: str) -> Dict:
         """
-        Nhận diện ý định pháp lý:
+        Nhận diện ý định pháp lý (hỗ trợ cả tiếng Việt có dấu và không dấu):
         1. Tên luật cụ thể được nhắc tới (explicit_law_id).
         2. Các lĩnh vực liên quan (detected_domains).
         """
+        query_norm = remove_accents(query_lower)
         explicit_law_id = None
         for kw, law_id in LEGAL_ACRONYMS_MAP.items():
-            if re.search(r"\b" + re.escape(kw) + r"\b", query_lower):
+            kw_norm = remove_accents(kw)
+            if re.search(r"\b" + re.escape(kw) + r"\b", query_lower) or re.search(r"\b" + re.escape(kw_norm) + r"\b", query_norm):
                 explicit_law_id = law_id
                 break
 
         detected_domains: Set[str] = set()
         for dom, keywords in DOMAIN_KEYWORDS.items():
             for kw in keywords:
-                if kw in query_lower:
+                kw_norm = remove_accents(kw)
+                if kw in query_lower or kw_norm in query_norm:
                     detected_domains.add(dom)
 
         return {
@@ -189,6 +200,7 @@ class LegalRAGEngine:
     def search(self, query: str, category: Optional[str] = None, domain: Optional[str] = None, top_k: int = 4) -> List[Dict]:
         """
         Tìm kiếm các Điều luật liên quan nhất dựa trên Scoped Hybrid Score:
+        - Hỗ trợ cả tiếng Việt có dấu và không dấu
         - Phân giải Namespace & Acronyms
         - Tự động nhận diện Domain để chống nhiễu (Domain Boost)
         - So khớp chính xác số điều & từ khóa
@@ -197,7 +209,9 @@ class LegalRAGEngine:
             return []
 
         query_lower = query.lower()
+        query_norm = remove_accents(query_lower)
         query_words = set(re.findall(r"\w+", query_lower))
+        query_words_norm = set(re.findall(r"\w+", query_norm))
         query_digits = set(re.findall(r"\d+", query_lower))
 
         # Phân tích ý định & miền pháp luật
@@ -208,7 +222,7 @@ class LegalRAGEngine:
             detected_domains.append(domain)
 
         # Kiểm tra xem người dùng có nhắc đến số điều luật cụ thể không (ví dụ: "điều 35", "điều 174", "328")
-        article_matches = re.findall(r"điều\s+(\d+)", query_lower)
+        article_matches = re.findall(r"điều\s+(\d+)", query_lower) or re.findall(r"dieu\s+(\d+)", query_norm)
         article_targets = [f"điều {num}" for num in article_matches]
 
         scored_articles = []
@@ -218,9 +232,12 @@ class LegalRAGEngine:
             item_law_id = item.get("law_id", "").lower()
             item_domain = item.get("domain", "").lower()
             art_num_lower = item.get("article_number", "").lower()
+            art_num_norm = remove_accents(art_num_lower)
             art_title_lower = item.get("article_title", "").lower()
+            art_title_norm = remove_accents(art_title_lower)
             law_name_lower = item.get("law_name", "").lower()
             content_lower = item.get("content", "").lower()
+            content_norm = remove_accents(content_lower)
             keywords = [kw.lower() for kw in item.get("keywords", [])]
 
             # --- A. TRỌNG SỐ MIỀN & TÊN LUẬT ĐÍCH DANH (CHỐNG LOẠN THÔNG TIN) ---
@@ -235,36 +252,46 @@ class LegalRAGEngine:
 
             # --- B. TRÙNG KHỚP SỐ ĐIỀU LUẬT ---
             for target in article_targets:
-                if target == art_num_lower:
+                if target == art_num_lower or remove_accents(target) == art_num_norm:
                     score += 60
 
             art_digits = set(re.findall(r"\d+", art_num_lower))
             if query_digits and art_digits and query_digits.intersection(art_digits):
                 score += 40
 
-            if query_lower in art_num_lower:
+            if query_lower in art_num_lower or query_norm in art_num_norm:
                 score += 35
 
-            if query_lower in art_title_lower:
+            if query_lower in art_title_lower or query_norm in art_title_norm:
                 score += 30
 
             # --- C. KHỚP TỪ KHÓA CHUYÊN NGÀNH ---
             for kw in keywords:
-                if kw in query_lower:
+                kw_norm = remove_accents(kw)
+                if kw in query_lower or kw_norm in query_norm:
                     score += 20
                 else:
                     kw_tokens = set(kw.split())
                     matched_tokens = kw_tokens.intersection(query_words)
+                    if not matched_tokens:
+                        kw_tokens_norm = set(kw_norm.split())
+                        matched_tokens = kw_tokens_norm.intersection(query_words_norm)
                     if len(matched_tokens) >= 2:
                         score += 10
 
             # --- D. KHỚP TIÊU ĐỀ & NỘI DUNG ---
             title_tokens = set(re.findall(r"\w+", art_title_lower))
             matched_title = title_tokens.intersection(query_words)
+            if not matched_title:
+                title_tokens_norm = set(re.findall(r"\w+", art_title_norm))
+                matched_title = title_tokens_norm.intersection(query_words_norm)
             score += len(matched_title) * 4
 
             content_tokens = set(re.findall(r"\w+", content_lower))
             matched_content = content_tokens.intersection(query_words)
+            if not matched_content:
+                content_tokens_norm = set(re.findall(r"\w+", content_norm))
+                matched_content = content_tokens_norm.intersection(query_words_norm)
             score += min(len(matched_content) * 0.5, 12)
 
             if score > 5:

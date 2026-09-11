@@ -177,12 +177,13 @@ class LegalCalculator:
         Thời gian tính trợ cấp = Tổng thời gian làm việc thực tế - Thời gian đã tham gia BHTN.
         Mỗi năm làm việc được trợ cấp 1/2 tháng tiền lương.
         """
+        # Làm tròn theo Khoản 2 Điều 8 Nghị định 145/2020/NĐ-CP:
+        # Tháng lẻ từ đủ 01 đến 06 tháng tính 1/2 năm (0.5 năm); trên 06 tháng tính 01 năm làm việc.
         months_eligible = max(0.0, months_worked - months_unemployment_insured)
-        # Làm tròn theo quy định: Dưới 06 tháng tính 1/2 năm, từ 06 tháng trở lên tính 01 năm
         full_years = int(months_eligible // 12)
         rem_months = months_eligible % 12
 
-        if rem_months >= 6:
+        if rem_months > 6:
             calc_years = full_years + 1.0
         elif rem_months > 0:
             calc_years = full_years + 0.5
